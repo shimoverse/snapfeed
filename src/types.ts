@@ -4,6 +4,8 @@
 
 // ─── Payload ──────────────────────────────────────────────────────────────────
 
+export type FeedbackCategory = 'bug' | 'idea' | 'question' | 'praise' | 'other'
+
 export interface FeedbackPayload {
   /** The feedback text written by the user */
   text: string
@@ -21,6 +23,8 @@ export interface FeedbackPayload {
   metadata?: FeedbackMetadata
   /** Attached screenshot */
   screenshot?: FeedbackScreenshot
+  /** Feedback category tag */
+  category?: FeedbackCategory
 }
 
 export interface FeedbackUser {

@@ -32,6 +32,8 @@ interface SupabaseFeedbackRow {
   delivered: boolean
   delivery_channel: string | null
   delivery_id: string | null
+  category: string | null
+  resolved: boolean
 }
 
 /**
@@ -102,6 +104,8 @@ export function supabaseAdapter(options: SupabaseAdapterOptions): FeedbackAdapte
         delivered: false,
         delivery_channel: null,
         delivery_id: null,
+        category: payload.category ?? null,
+        resolved: false,
       }
 
       try {

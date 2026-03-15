@@ -8,7 +8,10 @@ A plug-and-play developer feedback widget for React apps. Drop it in, get a poli
 
 - 🎯 **Hotkey toggle** — default `Ctrl+Shift+F`, fully configurable
 - 📸 **Screenshot support** — paste from clipboard, drag-and-drop, file picker, or auto-capture via html2canvas
-- 🔌 **Adapter system** — chain multiple backends (Supabase + Telegram + Slack + webhooks)
+- ✏️ **Annotation layer** — annotate screenshots before submitting (pen, rectangle, arrow, highlighter)
+- 🏷️ **Category tags** — Bug, Idea, Question, Praise, Other chips on the form
+- 🔌 **Adapter system** — chain multiple backends (Supabase + Telegram + Slack + GitHub Issues + webhooks)
+- 📥 **FeedbackInbox** — full admin panel component to browse, filter, sort, and resolve submissions
 - 🎨 **Zero CSS dependencies** — all styles are inline (no Tailwind, no CSS modules, no external stylesheets)
 - 🌗 **Dark mode** — auto-detects system preference, or set manually
 - 🎨 **Themeable** — configure accent color and position
@@ -455,7 +458,9 @@ CREATE TABLE feedback (
   metadata jsonb,
   delivered boolean DEFAULT false,
   delivery_channel text,
-  delivery_id text
+  delivery_id text,
+  category text,         -- 'bug' | 'idea' | 'question' | 'praise' | 'other'
+  resolved boolean DEFAULT false
 );
 
 -- Optional: enable RLS
@@ -467,6 +472,14 @@ ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 -- Allow anon insert if using client-side adapter
 CREATE POLICY "Allow anon insert" ON feedback
   FOR INSERT TO anon WITH CHECK (true);
+```
+
+If you have an existing `feedback` table, add the new columns:
+
+```sql
+ALTER TABLE feedback
+  ADD COLUMN IF NOT EXISTS category text,
+  ADD COLUMN IF NOT EXISTS resolved boolean DEFAULT false;
 ```
 
 ### Telegram adapter
@@ -516,6 +529,41 @@ webhookAdapter({
   headers: { 'Authorization': 'Bearer your-token' },
   timeoutMs: 10000, // default
   transform: (payload) => ({ ...payload, source: 'devtools-feedback' }), // optional
+})
+```
+
+### GitHub Issues adapter
+
+Creates a GitHub issue for each feedback submission. **Server-side only** — never expose your token to the browser.
+
+```ts
+import { githubAdapter } from 'snapfeed/adapters'
+
+githubAdapter({
+  token: process.env.GITHUB_TOKEN!,     // Personal Access Token with issues:write scope
+  owner: 'my-org',                      // GitHub owner or username
+  repo: 'my-app',                       // Repository name
+  labels: ['feedback', 'user-report'],  // Default labels (optional)
+  assignees: ['myusername'],            // Default assignees (optional)
+})
+```
+
+**What it creates:**
+
+- **Title:** `[Feedback] 🐛 Something is broken on the...`
+- **Body:** Formatted markdown with full text, page URL, sender info, viewport, user agent, console errors, and a note about the screenshot (stored in your primary adapter like Supabase)
+- **Labels:** Your default labels + a category label (`bug`, `enhancement`, `question`, `feedback`)
+- **Category-to-label mapping:** `bug → bug`, `idea → enhancement`, `question → question`, `praise/other → feedback`
+
+Use this in a server-side handler (Next.js API route or Express middleware):
+
+```ts
+// app/api/feedback/route.ts
+export const POST = createFeedbackHandler({
+  adapters: [
+    supabaseAdapter({ url: process.env.SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
+    githubAdapter({ token: process.env.GITHUB_TOKEN!, owner: 'my-org', repo: 'my-app' }),
+  ],
 })
 ```
 
@@ -627,6 +675,132 @@ interface FeedbackPayload {
   }
 }
 ```
+
+---
+
+---
+
+## Annotation Layer
+
+After attaching a screenshot (paste, upload, or auto-capture), a **✏️ Annotate** button appears on the image preview. Clicking it opens a full-screen annotation canvas.
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| ✏️ Pen | Free-draw strokes |
+| ⬜ Rectangle | Outline boxes to highlight areas |
+| ↗ Arrow | Draw arrows pointing at issues |
+| 🖊 Highlighter | Semi-transparent yellow overlay |
+
+### Colors
+
+Red (default), yellow, blue, white, black — click any dot to switch.
+
+### Controls
+
+- **↩ Undo** — remove the last stroke
+- **✓ Done** — merge the annotations onto the screenshot; the annotated PNG replaces the original
+- **Cancel** — discard annotations and return to the form
+
+### UX flow
+
+1. User attaches screenshot (paste, drag-and-drop, or file picker)
+2. `✏️ Annotate` button appears next to the image preview
+3. Click opens the annotation overlay
+4. Draw with the chosen tool and color
+5. Click **Done** → the annotated image replaces the original in the payload
+6. Submit as usual
+
+No external libraries. Pure Canvas API, fully inline styles.
+
+---
+
+## Feedback Categories
+
+A single-select category row appears in the feedback form between the header and the textarea.
+
+### Available categories
+
+| Chip | Value | Telegram/Slack/GitHub label |
+|------|-------|----------------------------|
+| 🐛 Bug | `bug` | `bug` label on GitHub |
+| 💡 Idea | `idea` | `enhancement` label on GitHub |
+| ❓ Question | `question` | `question` label on GitHub |
+| 🙌 Praise | `praise` | `feedback` label on GitHub |
+| 📝 Other | `other` | `feedback` label on GitHub |
+
+Click a chip to select it; click again to deselect. The selected chip gets an accent-colored background.
+
+The `category` field is included in every `FeedbackPayload`:
+
+```ts
+interface FeedbackPayload {
+  // ... existing fields ...
+  category?: 'bug' | 'idea' | 'question' | 'praise' | 'other'
+}
+```
+
+All adapters include the category:
+- **Telegram** — shown in the message header: `🔧 MyApp Feedback 🐛 Bug`
+- **Slack** — shown as a separate field in the Block Kit section
+- **Supabase** — stored in the `category` column
+- **GitHub** — used as a label + shown in the issue title and body
+
+---
+
+## FeedbackInbox Component
+
+A self-contained admin panel for browsing, filtering, and resolving feedback from Supabase.
+
+```tsx
+import { FeedbackInbox } from 'snapfeed'
+
+// In your admin page:
+<FeedbackInbox
+  supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+  supabaseKey={process.env.SUPABASE_SERVICE_ROLE_KEY!}
+  appName="MyApp"         // optional: filter to one app
+  accentColor="#D4714B"  // optional
+  theme="auto"           // optional: "auto" | "light" | "dark"
+/>
+```
+
+### FeedbackInbox Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `supabaseUrl` | `string` | required | Your Supabase project URL |
+| `supabaseKey` | `string` | required | Anon key (public) or service role key (server-rendered pages) |
+| `table` | `string` | `"feedback"` | Table name to read from |
+| `appName` | `string` | — | Filter results to one app |
+| `accentColor` | `string` | `"#D4714B"` | Accent color for highlights |
+| `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | Color theme |
+| `className` | `string` | — | CSS class for the root container |
+
+### Features
+
+- **Search** — filter by text content (case-insensitive)
+- **Category filter** — show only bugs, ideas, questions, etc.
+- **Delivery filter** — delivered / undelivered
+- **Status filter** — open / resolved
+- **Date range** — from/to date pickers
+- **Sort** — newest first or oldest first
+- **Pagination** — 25 items per page
+- **Expandable rows** — click any row to see full text, page URL, sender email, viewport, user agent, console errors, and the screenshot
+- **Resolve / Reopen** — toggle the `resolved` boolean column directly from the inbox
+
+### Required table columns
+
+The inbox reads and writes these Supabase columns:
+
+```
+id, created_at, app_name, text, page_name, page_url, sender, sender_email,
+image_base64, image_mime_type, metadata, delivered, delivery_channel, delivery_id,
+category, resolved
+```
+
+See the [SQL schema](#supabase-adapter) for the full `CREATE TABLE` statement.
 
 ---
 

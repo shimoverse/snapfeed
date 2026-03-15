@@ -13,6 +13,9 @@ export type { SlackAdapterOptions } from './slack'
 export { supabaseAdapter } from './supabase'
 export type { SupabaseAdapterOptions } from './supabase'
 
+export { githubAdapter } from './github'
+export type { GitHubAdapterOptions } from './github'
+
 export type {
   FeedbackAdapter,
   FeedbackAdapterResult,

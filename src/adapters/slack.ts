@@ -43,12 +43,24 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
         ? `${payload.user.name}${payload.user.email ? ` <${payload.user.email}>` : ''}`
         : 'Anonymous'
 
+      const CATEGORY_EMOJIS: Record<string, string> = {
+        bug: '🐛',
+        idea: '💡',
+        question: '❓',
+        praise: '🙌',
+        other: '📝',
+      }
+
+      const categoryLabel = payload.category
+        ? ` ${CATEGORY_EMOJIS[payload.category] ?? ''} ${payload.category.charAt(0).toUpperCase() + payload.category.slice(1)}`
+        : ''
+
       const blocks: unknown[] = [
         {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `🔧 ${payload.appName} Feedback`,
+            text: `🔧 ${payload.appName} Feedback${categoryLabel}`,
             emoji: true,
           },
         },
@@ -66,6 +78,14 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
               type: 'mrkdwn',
               text: `*From:*\n${senderInfo}`,
             },
+            ...(payload.category
+              ? [
+                  {
+                    type: 'mrkdwn',
+                    text: `*Category:*\n${CATEGORY_EMOJIS[payload.category] ?? ''} ${payload.category}`,
+                  },
+                ]
+              : []),
             {
               type: 'mrkdwn',
               text: `*Page:*\n${payload.pageName || payload.pageUrl}`,

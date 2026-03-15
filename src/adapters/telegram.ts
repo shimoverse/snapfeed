@@ -19,9 +19,22 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
 }
 
+const CATEGORY_EMOJIS: Record<string, string> = {
+  bug: '🐛',
+  idea: '💡',
+  question: '❓',
+  praise: '🙌',
+  other: '📝',
+}
+
 function buildMessage(payload: FeedbackPayload): string {
+  const categoryEmoji = payload.category ? (CATEGORY_EMOJIS[payload.category] ?? '') : ''
+  const categoryLabel = payload.category
+    ? ` ${categoryEmoji} ${payload.category.charAt(0).toUpperCase() + payload.category.slice(1)}`
+    : ''
+
   const parts: string[] = [
-    `🔧 <b>${escapeHtml(payload.appName)} Feedback</b>`,
+    `🔧 <b>${escapeHtml(payload.appName)} Feedback${categoryLabel}</b>`,
   ]
 
   if (payload.user?.name) {

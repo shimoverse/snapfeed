@@ -8,8 +8,19 @@ import React, {
 } from 'react'
 import { useFeedbackContext } from './FeedbackProvider'
 import { fileToScreenshot, captureScreenshot, extractImageFromClipboard } from './screenshot'
-import { getThemeColors, getModalPosition, injectAnimations } from './styles'
-import type { FeedbackPayload, FeedbackScreenshot } from './types'
+import { getThemeColors, getModalPosition, injectAnimations, resolveTheme } from './styles'
+import { AnnotationCanvas } from './AnnotationCanvas'
+import type { FeedbackPayload, FeedbackScreenshot, FeedbackCategory } from './types'
+
+// ─── Category config ──────────────────────────────────────────────────────────
+
+const CATEGORIES: Array<{ id: FeedbackCategory; label: string; emoji: string }> = [
+  { id: 'bug', label: 'Bug', emoji: '🐛' },
+  { id: 'idea', label: 'Idea', emoji: '💡' },
+  { id: 'question', label: 'Question', emoji: '❓' },
+  { id: 'praise', label: 'Praise', emoji: '🙌' },
+  { id: 'other', label: 'Other', emoji: '📝' },
+]
 
 // ─── Pen/Edit Icon ────────────────────────────────────────────────────────────
 
@@ -95,11 +106,14 @@ export function FeedbackWidget() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [capturingAuto, setCapturingAuto] = useState(false)
+  const [category, setCategory] = useState<FeedbackCategory | null>(null)
+  const [annotating, setAnnotating] = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const colors = getThemeColors(theme, accentColor)
+  const resolvedTheme = resolveTheme(theme)
 
   // Inject CSS animations once
   useEffect(() => {
@@ -149,6 +163,8 @@ export function FeedbackWidget() {
         setImagePreview(null)
         setError(null)
         setSubmitted(false)
+        setCategory(null)
+        setAnnotating(false)
       }, 200)
       return () => clearTimeout(timer)
     }
@@ -207,7 +223,17 @@ export function FeedbackWidget() {
   function handleRemoveImage() {
     setScreenshot(null)
     setImagePreview(null)
+    setAnnotating(false)
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  function handleAnnotationDone(annotatedDataUrl: string) {
+    setAnnotating(false)
+    setImagePreview(annotatedDataUrl)
+
+    // Convert the merged data URL back to a FeedbackScreenshot
+    const base64 = annotatedDataUrl.split(',')[1] ?? ''
+    setScreenshot({ base64, mimeType: 'image/png' })
   }
 
   // Drag and drop
@@ -227,6 +253,10 @@ export function FeedbackWidget() {
     close()
   }, [close])
 
+  function toggleCategory(id: FeedbackCategory) {
+    setCategory(prev => (prev === id ? null : id))
+  }
+
   async function handleSubmit() {
     if (!text.trim() || submitting) return
     setSubmitting(true)
@@ -243,6 +273,7 @@ export function FeedbackWidget() {
       pageName: pageTitle,
       user: config.user,
       screenshot: screenshot ?? undefined,
+      category: category ?? undefined,
     }
 
     try {
@@ -264,6 +295,17 @@ export function FeedbackWidget() {
 
   return (
     <>
+      {/* Annotation overlay — rendered above everything */}
+      {annotating && imagePreview && (
+        <AnnotationCanvas
+          imageDataUrl={imagePreview}
+          onDone={handleAnnotationDone}
+          onCancel={() => setAnnotating(false)}
+          accentColor={accentColor}
+          theme={resolvedTheme}
+        />
+      )}
+
       {/* Backdrop */}
       <div
         className="__dtfb_overlay"
@@ -387,6 +429,57 @@ export function FeedbackWidget() {
               </div>
             ) : (
               <>
+                {/* Category chips */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '6px',
+                    flexWrap: 'wrap',
+                    marginBottom: '12px',
+                  }}
+                >
+                  {CATEGORIES.map(cat => {
+                    const isSelected = category === cat.id
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => toggleCategory(cat.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          border: `1px solid ${isSelected ? accentColor : colors.border}`,
+                          background: isSelected ? `${accentColor}18` : colors.surface,
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: isSelected ? 600 : 400,
+                          color: isSelected ? accentColor : colors.textMuted,
+                          fontFamily: 'inherit',
+                          transition: 'background 0.12s, border-color 0.12s, color 0.12s',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isSelected) {
+                            ;(e.currentTarget as HTMLButtonElement).style.background =
+                              colors.surfaceHover
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) {
+                            ;(e.currentTarget as HTMLButtonElement).style.background =
+                              colors.surface
+                          }
+                        }}
+                      >
+                        <span>{cat.emoji}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
                 {/* Textarea */}
                 <textarea
                   ref={textareaRef}
@@ -432,7 +525,7 @@ export function FeedbackWidget() {
                     </div>
                   ) : imagePreview ? (
                     <div
-                      style={{ position: 'relative', display: 'inline-block' }}
+                      style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-start', gap: '8px' }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -440,13 +533,14 @@ export function FeedbackWidget() {
                         alt="Attached screenshot"
                         style={{
                           height: '80px',
-                          maxWidth: '100%',
+                          maxWidth: '200px',
                           borderRadius: '8px',
                           border: `1px solid ${colors.border}`,
                           objectFit: 'cover',
                           display: 'block',
                         }}
                       />
+                      {/* Remove button */}
                       <button
                         onClick={handleRemoveImage}
                         aria-label="Remove screenshot"
@@ -470,6 +564,38 @@ export function FeedbackWidget() {
                         }}
                       >
                         ×
+                      </button>
+                      {/* Annotate button */}
+                      <button
+                        onClick={() => setAnnotating(true)}
+                        title="Annotate screenshot"
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          border: `1px solid ${colors.border}`,
+                          background: colors.surface,
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          color: colors.textMuted,
+                          fontFamily: 'inherit',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          alignSelf: 'flex-end',
+                          marginBottom: '2px',
+                          transition: 'background 0.12s',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => {
+                          ;(e.currentTarget as HTMLButtonElement).style.background =
+                            colors.surfaceHover
+                        }}
+                        onMouseLeave={e => {
+                          ;(e.currentTarget as HTMLButtonElement).style.background =
+                            colors.surface
+                        }}
+                      >
+                        ✏️ Annotate
                       </button>
                     </div>
                   ) : (
