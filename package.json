@@ -2,7 +2,7 @@
   "name": "snapfeed",
   "version": "0.1.0",
   "description": "Drop-in developer feedback widget for React/Next.js. Hotkey-activated, screenshot support, pluggable adapters (Supabase, Telegram, Slack, webhook).",
-  "author": "Mohit Jain",
+  "author": "snapfeed contributors",
   "license": "MIT",
   "keywords": [
     "feedback",

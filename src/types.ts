@@ -7,7 +7,7 @@
 export interface FeedbackPayload {
   /** The feedback text written by the user */
   text: string
-  /** The application name (e.g. "Shimoverse", "Moshiverse") */
+  /** The application name (e.g. "MyApp", "Dashboard") */
   appName: string
   /** Full URL of the current page */
   pageUrl: string

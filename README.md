@@ -223,7 +223,7 @@ import { telegramAdapter } from 'snapfeed/adapters'
 
 telegramAdapter({
   botToken: process.env.TELEGRAM_BOT_TOKEN!,
-  chatId: '-5133507091', // group chat id (with leading -)
+  chatId: process.env.TELEGRAM_CHAT_ID!, // group chat id (with leading -)
   sendScreenshot: true, // default: true
 })
 ```
@@ -231,7 +231,7 @@ telegramAdapter({
 Sends a formatted HTML message:
 ```
 🔧 MyApp Feedback
-From: Mohit
+From: Jane
 Page: Dashboard /dashboard
 
 Something is broken on this page.
@@ -427,15 +427,15 @@ The widget is **always active** on `localhost` regardless of this setting.
 
 ## Recipes
 
-### Shimoverse pattern (Supabase + Telegram via server route)
+### Full stack pattern (Supabase + Telegram via server route)
 
 ```tsx
 // layout.tsx
 <FeedbackProvider
-  appName="Shimoverse"
+  appName="MyApp"
   accentColor="#D4714B"
   apiUrl="/api/feedback"
-  user={{ name: 'Mohit' }}
+  user={{ name: 'Jane' }}
 >
   {children}
 </FeedbackProvider>
@@ -444,7 +444,7 @@ The widget is **always active** on `localhost` regardless of this setting.
 export const POST = createFeedbackHandler({
   adapters: [
     supabaseAdapter({ url: process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
-    telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN!, chatId: '-5133507091' }),
+    telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN!, chatId: process.env.TELEGRAM_CHAT_ID! }),
   ],
 })
 ```
