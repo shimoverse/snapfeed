@@ -1,0 +1,84 @@
+{
+  "name": "snapfeed",
+  "version": "0.1.0",
+  "description": "Drop-in developer feedback widget for React/Next.js. Hotkey-activated, screenshot support, pluggable adapters (Supabase, Telegram, Slack, webhook).",
+  "author": "Mohit Jain",
+  "license": "MIT",
+  "keywords": [
+    "feedback",
+    "widget",
+    "react",
+    "nextjs",
+    "developer-tools",
+    "devtools",
+    "supabase",
+    "telegram",
+    "screenshot",
+    "snapfeed"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shimoverse/snapfeed"
+  },
+  "homepage": "https://github.com/shimoverse/snapfeed#readme",
+  "bugs": {
+    "url": "https://github.com/shimoverse/snapfeed/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.mjs",
+      "require": "./dist/adapters/index.cjs"
+    },
+    "./server/nextjs": {
+      "types": "./dist/server/nextjs.d.ts",
+      "import": "./dist/server/nextjs.mjs",
+      "require": "./dist/server/nextjs.cjs"
+    },
+    "./server/express": {
+      "types": "./dist/server/express.d.ts",
+      "import": "./dist/server/express.mjs",
+      "require": "./dist/server/express.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run type-check"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "html2canvas": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/node": "^20.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "optionalDependencies": {
+    "html2canvas": "^1.4.1"
+  }
+}
