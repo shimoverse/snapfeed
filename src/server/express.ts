@@ -3,32 +3,50 @@
  *
  * Drop-in POST handler for Express and Express-compatible frameworks.
  *
+ * Includes built-in:
+ * - Rate limiting (in-memory by default, pluggable store for Redis/Upstash)
+ * - Payload size validation (text + screenshot)
+ * - Origin allowlist enforcement
+ * - Console error sanitization (strips tokens/secrets/JWTs)
+ *
  * @example
  * import express from 'express'
  * import { feedbackMiddleware } from 'snapfeed/server/express'
  * import { supabaseAdapter, telegramAdapter } from 'snapfeed/adapters'
  *
  * const app = express()
- * app.use(express.json())
+ * app.use(express.json({ limit: '10mb' }))
  *
  * app.post('/api/feedback', feedbackMiddleware({
  *   adapters: [
  *     supabaseAdapter({ url: process.env.SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
  *     telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN!, chatId: process.env.TELEGRAM_CHAT_ID! }),
  *   ],
+ *   rateLimit: { max: 10, windowMs: 60_000 },       // 10 requests/min per IP
+ *   maxScreenshotBytes: 5 * 1024 * 1024,            // 5MB screenshot cap
+ *   allowedOrigins: ['https://myapp.com'],           // optional origin allowlist
  * }))
  */
 
-import type { FeedbackHandlerConfig, FeedbackPayload } from '../types'
+import type { FeedbackHandlerConfig } from '../types'
+import {
+  checkRateLimit,
+  validatePayload,
+  checkOrigin,
+  normalizePayload,
+} from './security'
 
 // Minimal typings — avoid a hard express dependency
 type Request = {
   body: unknown
+  ip?: string
+  headers: Record<string, string | string[] | undefined>
 }
 
 type Response = {
   status(code: number): Response
   json(body: unknown): void
+  set(header: string, value: string): Response
 }
 
 type NextFn = (err?: unknown) => void
@@ -36,30 +54,54 @@ type NextFn = (err?: unknown) => void
 type ExpressMiddleware = (req: Request, res: Response, next: NextFn) => void | Promise<void>
 
 /**
- * Creates an Express middleware that runs your adapters on POST.
+ * Creates an Express middleware that runs your adapters on POST,
+ * with built-in rate limiting, payload validation, and origin checking.
  */
 export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddleware {
   return async function handler(req: Request, res: Response, next: NextFn) {
     try {
-      const body = req.body as Partial<FeedbackPayload>
+      // ── Origin check ────────────────────────────────────────────────────────
+      const origin = Array.isArray(req.headers['origin'])
+        ? req.headers['origin'][0]
+        : req.headers['origin'] ?? null
 
-      if (!body?.text?.trim()) {
-        res.status(400).json({ error: 'Feedback text is required' })
+      if (!checkOrigin(origin, config.allowedOrigins)) {
+        res.status(403).json({ error: 'Origin not allowed' })
         return
       }
 
-      const normalized: FeedbackPayload = {
-        text: body.text.trim(),
-        appName: body.appName ?? 'App',
-        pageUrl: body.pageUrl ?? '',
-        pageName: body.pageName ?? '',
-        timestamp: body.timestamp ?? new Date().toISOString(),
-        user: body.user,
-        metadata: body.metadata,
-        screenshot: body.screenshot,
+      // ── Rate limiting ──────────────────────────────────────────────────────
+      if (config.rateLimit) {
+        const forwardedFor = req.headers['x-forwarded-for']
+        const ip =
+          req.ip ??
+          (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]?.trim()) ??
+          req.headers['x-real-ip'] as string ??
+          'unknown'
+
+        const { allowed, remaining, resetAt } = await checkRateLimit(ip, config)
+        void remaining
+
+        if (!allowed) {
+          res
+            .status(429)
+            .set('Retry-After', String(Math.ceil((resetAt - Date.now()) / 1000)))
+            .set('X-RateLimit-Remaining', '0')
+            .json({ error: 'Too many feedback submissions. Please wait a moment.' })
+          return
+        }
       }
 
-      // Optional pre-receive hook
+      // ── Validate payload ───────────────────────────────────────────────────
+      const validation = validatePayload(req.body, config)
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error })
+        return
+      }
+
+      const normalized = normalizePayload(req.body)
+
+      // ── Optional pre-receive hook ──────────────────────────────────────────
       if (config.onReceive) {
         const allowed = await config.onReceive(normalized)
         if (!allowed) {
@@ -68,7 +110,7 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
         }
       }
 
-      // Run all adapters
+      // ── Run all adapters ───────────────────────────────────────────────────
       const results = await Promise.allSettled(
         config.adapters.map(adapter => adapter.send(normalized))
       )
@@ -82,12 +124,12 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
       const anyOk = adapterResults.some(r => r.ok)
 
       if (!anyOk) {
-        console.error('[devtools/feedback] All adapters failed:', adapterResults)
+        console.error('[snapfeed] All adapters failed:', adapterResults)
         res.status(503).json({ error: 'Could not deliver feedback. Please try again.' })
         return
       }
 
-      // Optional post-complete hook
+      // ── Optional post-complete hook ────────────────────────────────────────
       if (config.onComplete) {
         await config.onComplete(normalized, adapterResults)
       }

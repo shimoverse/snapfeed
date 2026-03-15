@@ -36,4 +36,8 @@ export type {
   FeedbackPosition,
   FeedbackTheme,
   FeedbackCategory,
+  RateLimitStore,
 } from './types'
+
+// ─── Server security utilities (for custom store implementations) ─────────────
+export { defaultRateLimitStore } from './server/security'

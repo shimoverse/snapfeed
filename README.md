@@ -911,6 +911,110 @@ function Sidebar() {
 
 ---
 
+## Security
+
+snapfeed is built for developer and internal use. Here's what's protected by default and what you control.
+
+### Built-in protections
+
+| Protection | Default | Configurable |
+|---|---|---|
+| **Production off by default** | Widget hidden in prod unless `enableInProduction: true` | Yes |
+| **Rate limiting** | Not active unless you set `rateLimit` | Yes — per-IP sliding window |
+| **Payload size cap** | 10KB text/metadata, 5MB screenshot | Yes — `maxPayloadBytes`, `maxScreenshotBytes` |
+| **Console error sanitization** | Auto-strips tokens, keys, secrets, JWTs from captured errors | Always on |
+| **Origin allowlist** | Open (no restriction) | Yes — `allowedOrigins` |
+
+### Rate limiting
+
+Enabled by adding `rateLimit` to `createFeedbackHandler` or `feedbackMiddleware`. Uses an in-memory sliding window per IP by default — works for single-instance servers. For multi-instance deployments (multiple Vercel regions, clustered Node), provide a Redis/Upstash-backed store.
+
+```ts
+// Basic — 10 submissions per minute per IP
+export const POST = createFeedbackHandler({
+  adapters: [...],
+  rateLimit: { max: 10, windowMs: 60_000 },
+})
+
+// Custom store (Redis / Upstash)
+import type { RateLimitStore } from 'snapfeed'
+
+const redisStore: RateLimitStore = {
+  async increment(key, windowMs) {
+    // Your Redis INCR + EXPIRE logic here
+    // Must return: { count: number, resetAt: number (ms epoch) }
+  },
+}
+
+export const POST = createFeedbackHandler({
+  adapters: [...],
+  rateLimit: { max: 10, windowMs: 60_000, store: redisStore },
+})
+```
+
+### Origin allowlist
+
+Restrict submissions to specific domains. Accepts exact strings or RegExp.
+
+```ts
+export const POST = createFeedbackHandler({
+  adapters: [...],
+  allowedOrigins: [
+    'https://myapp.com',
+    'https://staging.myapp.com',
+    /\.myapp\.com$/,   // all subdomains
+  ],
+})
+```
+
+### Screenshot size cap
+
+```ts
+export const POST = createFeedbackHandler({
+  adapters: [...],
+  maxScreenshotBytes: 2 * 1024 * 1024, // 2MB cap
+})
+```
+
+### Keeping secrets server-side
+
+**Never** pass `supabaseAdapter` with a service role key or `telegramAdapter` with a bot token directly inside `FeedbackProvider` (client-side). Both would be visible in the browser bundle.
+
+✅ **Correct — secrets stay on the server:**
+```tsx
+// Client: no secrets
+<FeedbackProvider appName="MyApp" apiUrl="/api/feedback">
+
+// Server: secrets here only
+export const POST = createFeedbackHandler({
+  adapters: [
+    supabaseAdapter({ serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
+    telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN! }),
+  ],
+})
+```
+
+❌ **Wrong — bot token exposed to browser:**
+```tsx
+<FeedbackProvider
+  adapters={[telegramAdapter({ botToken: 'bot123:...' })]} // ← visible in bundle
+>
+```
+
+### Production use with real users
+
+If you enable `enableInProduction: true` for beta users or internal testers, scope it by user role to prevent it appearing for all end users:
+
+```tsx
+<FeedbackProvider
+  enableInProduction={user?.role === 'admin' || user?.isBetaTester}
+  user={{ name: user.name, email: user.email }}
+  apiUrl="/api/feedback"
+>
+```
+
+---
+
 ## Browser Support
 
 All modern browsers. No IE support. Uses `fetch`, `FileReader`, `ClipboardEvent`, `KeyboardEvent`.

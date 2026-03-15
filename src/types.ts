@@ -178,4 +178,43 @@ export interface FeedbackHandlerConfig {
     payload: FeedbackPayload,
     results: FeedbackAdapterResult[]
   ) => void | Promise<void>
+  /**
+   * Rate limiting configuration.
+   * Uses an in-memory sliding window per IP by default.
+   * For multi-instance deployments, provide a custom `rateLimitStore`.
+   */
+  rateLimit?: {
+    /** Max requests per window. @default 10 */
+    max?: number
+    /** Window duration in milliseconds. @default 60000 (1 min) */
+    windowMs?: number
+    /** Custom store for distributed deployments (e.g. Redis/Upstash) */
+    store?: RateLimitStore
+  }
+  /**
+   * Max allowed payload size in bytes (text + metadata, not screenshot).
+   * @default 10000 (10KB)
+   */
+  maxPayloadBytes?: number
+  /**
+   * Max screenshot size in bytes (base64 decoded).
+   * @default 5242880 (5MB)
+   */
+  maxScreenshotBytes?: number
+  /**
+   * Allowlist of origins permitted to submit feedback.
+   * If set, requests from other origins are rejected with 403.
+   * Accepts exact strings or RegExp patterns.
+   * @example ['https://myapp.com', /\.myapp\.com$/]
+   */
+  allowedOrigins?: (string | RegExp)[]
+}
+
+/**
+ * Interface for a custom rate limit store (e.g. Redis, Upstash).
+ * Implement this to share rate limit state across multiple server instances.
+ */
+export interface RateLimitStore {
+  /** Increment hit count for key, return current count and reset time (ms epoch). */
+  increment(key: string, windowMs: number): Promise<{ count: number; resetAt: number }>
 }
