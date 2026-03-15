@@ -20,6 +20,259 @@ A plug-and-play developer feedback widget for React apps. Drop it in, get a poli
 
 ---
 
+## Who Is This For?
+
+| Role | How they use snapfeed |
+|------|----------------------|
+| 🧑‍💼 **Product Manager** | Test features in staging, flag UX issues without leaving the browser |
+| 🧪 **QA Engineer** | File bugs with auto-captured screenshots and console errors attached |
+| 👨‍💻 **Developer** | Hotkey-activated during local dev — never context-switch to Jira mid-flow |
+| 🎨 **Designer** | Annotate screenshots and mark exactly what looks off |
+| 🚀 **Founder / Solo builder** | Ship fast, get real-time feedback from beta users without a support tool |
+
+---
+
+## User Journeys
+
+### 🧑‍💼 Product Manager — Reviewing a staging build
+
+```
+Sarah is reviewing the new checkout flow on staging before sign-off.
+She hits a confusing UX on the payment step.
+```
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Sarah opens staging.myapp.com                      │
+│                                                     │
+│  Step 1 ─── Navigates to Checkout > Payment step   │
+│                                                     │
+│  Step 2 ─── Spots confusing label on "Save card"   │
+│             checkbox — it's ambiguous               │
+│                                                     │
+│  Step 3 ─── Presses Ctrl+Shift+F                   │
+│             ↓                                       │
+│  ┌─────────────────────────┐                        │
+│  │ 💡 Idea  🐛 Bug  ❓ Q   │  ← picks 💡 Idea      │
+│  │─────────────────────────│                        │
+│  │ 📍 Checkout / Payment   │                        │
+│  │                         │                        │
+│  │ "Save card" checkbox    │                        │
+│  │ copy is confusing —     │                        │
+│  │ does it save for this   │                        │
+│  │ session or permanently? │                        │
+│  │                         │                        │
+│  │ [📎 Attach screenshot]  │                        │
+│  │         [Send Feedback] │                        │
+│  └─────────────────────────┘                        │
+│                                                     │
+│  Step 4 ─── Pastes screenshot (⌘V)                 │
+│             Clicks ✏️ Annotate                      │
+│             Draws red arrow pointing at checkbox    │
+│                                                     │
+│  Step 5 ─── Clicks Send Feedback                   │
+│                                                     │
+│  Step 6 ─── Dev gets Slack/Telegram notification:  │
+│             "💡 Idea — Checkout/Payment             │
+│              Save card checkbox copy is confusing…" │
+│             + annotated screenshot attached         │
+└─────────────────────────────────────────────────────┘
+```
+
+**What Sarah never had to do:** Open Jira. Screenshot separately. Copy a URL. Write a ticket. Explain which page.
+
+---
+
+### 🧪 QA Engineer — Filing a bug during test run
+
+```
+Alex is running regression tests on the dashboard. 
+A chart fails to load on Firefox. Time to log it.
+```
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Alex opens app in Firefox, navigates to Dashboard  │
+│                                                     │
+│  Step 1 ─── Chart throws a JS error in console     │
+│             (snapfeed auto-captures it)             │
+│                                                     │
+│  Step 2 ─── Presses Ctrl+Shift+F                   │
+│                                                     │
+│  Step 3 ─── Selects 🐛 Bug category               │
+│                                                     │
+│  Step 4 ─── Types:                                 │
+│             "Revenue chart not rendering on         │
+│              Firefox 121. Console shows             │
+│              TypeError: d3 is not defined."         │
+│                                                     │
+│  Step 5 ─── snapfeed has already:                  │
+│             ✓ Captured current URL                  │
+│             ✓ Noted viewport: 1440x900              │
+│             ✓ Logged browser: Firefox 121           │
+│             ✓ Captured the console error            │
+│                                                     │
+│  Step 6 ─── Clicks Send                            │
+│                                                     │
+│  Result: GitHub Issue created automatically        │
+│  ┌─────────────────────────────────────────┐       │
+│  │ [Bug] 🐛 Revenue chart not rendering…   │       │
+│  │ Page: /dashboard                        │       │
+│  │ Browser: Firefox 121 / 1440x900         │       │
+│  │ Console error: TypeError: d3 is not…    │       │
+│  │ Labels: bug, dashboard                  │       │
+│  └─────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────┘
+```
+
+**What Alex never had to do:** Copy-paste the URL. Look up the browser version. Re-type the console error. Manually attach metadata.
+
+---
+
+### 👨‍💻 Developer — Catching your own bug mid-build
+
+```
+Dev is building a new feature on localhost:3000.
+Spots a layout issue on mobile viewport while testing.
+```
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Dev resizes browser to 375px (iPhone)             │
+│                                                     │
+│  Sidebar overflows — overlaps main content         │
+│                                                     │
+│  Ctrl+Shift+F  →  Widget opens                     │
+│                                                     │
+│  autoScreenshot: true fires html2canvas            │
+│  Screenshot auto-attached ✓                        │
+│                                                     │
+│  Types: "Sidebar overflow at <768px breakpoint"    │
+│  Selects 🐛 Bug                                    │
+│  Clicks ✏️ Annotate → draws red box on sidebar    │
+│  Sends                                             │
+│                                                     │
+│  consoleAdapter() logs to terminal:                │
+│  {                                                 │
+│    text: "Sidebar overflow at <768px...",          │
+│    category: "bug",                                │
+│    pageUrl: "localhost:3000/dashboard",            │
+│    metadata: { viewport: "375x812", ... }          │
+│    screenshot: { base64: "...", mimeType: "..."  } │
+│  }                                                 │
+│                                                     │
+│  → Creates GitHub issue or Slack message           │
+│    without leaving the browser                     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🚀 Beta launch — Collecting user feedback
+
+```
+You've shipped a beta. You want real users to report
+issues without a support form or Intercom subscription.
+```
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Enable snapfeed for beta users only:              │
+│                                                     │
+│  <FeedbackProvider                                 │
+│    enableInProduction={true}                       │
+│    user={{ name: session.user.name,                │
+│             email: session.user.email }}           │
+│    apiUrl="/api/feedback"                          │
+│  >                                                 │
+│                                                     │
+│  Beta user hits a broken page                      │
+│  Clicks the "Feedback" button (bottom-right)       │
+│  Fills form, pastes screenshot                     │
+│  Hits Send                                         │
+│                                                     │
+│  You get:                                          │
+│  ┌─────────────────────────────────────────┐       │
+│  │ Telegram message (instant):             │       │
+│  │ 🔧 MyApp Feedback                       │       │
+│  │ From: Alex Chen (alex@example.com)      │       │
+│  │ Page: Settings / Billing                │       │
+│  │ "The upgrade button does nothing on     │       │
+│  │  Safari — no error, just hangs"         │       │
+│  └─────────────────────────────────────────┘       │
+│                                                     │
+│  + row in Supabase feedback table                  │
+│  + GitHub issue (if githubAdapter configured)      │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Use Cases
+
+| Scenario | Recommended setup |
+|----------|------------------|
+| **Solo dev / side project** | `consoleAdapter()` locally, `telegramAdapter()` in staging |
+| **Startup in beta** | `supabaseAdapter` + `telegramAdapter` + `enableInProduction: true` for beta users |
+| **Agency / client work** | `slackAdapter` — feedback lands in the client's Slack channel |
+| **Open-source project** | `githubAdapter` — submissions become GitHub issues automatically |
+| **Enterprise SaaS** | `webhookAdapter` → your internal bug tracker (Jira, Linear, etc.) |
+| **QA team** | `supabaseAdapter` + `<FeedbackInbox />` on `/admin/feedback` for triage |
+| **Design review** | Annotation layer + `slackAdapter` → screenshot with drawings goes to #design |
+
+---
+
+## The Full Loop (End to End)
+
+```
+TESTER / PM / USER                    YOUR BACKEND
+──────────────────                    ────────────
+
+  Opens app on any page
+        │
+        ▼
+  Ctrl+Shift+F (or clicks button)
+        │
+        ▼
+  ┌─────────────────────┐
+  │  snapfeed widget    │
+  │  ─────────────────  │
+  │  Category: 🐛 Bug   │
+  │  Text: [........]   │
+  │  Screenshot: [img]  │
+  │  [Send Feedback]    │
+  └────────┬────────────┘
+           │ POST /api/feedback
+           ▼
+  ┌─────────────────────┐             ┌──────────────┐
+  │  Server handler     │────────────▶│  Supabase DB │
+  │  (Next.js/Express)  │             │  (persisted) │
+  └────────┬────────────┘             └──────────────┘
+           │
+           ├──────────────────────────▶ Telegram / Slack
+           │                            (instant notification)
+           │
+           └──────────────────────────▶ GitHub Issue
+                                        (auto-created)
+
+  ──────────────────────────────────────────────────
+  
+  Dev / PM opens /admin/feedback
+        │
+        ▼
+  ┌─────────────────────────────────────┐
+  │  <FeedbackInbox />                  │
+  │  ───────────────────────────────    │
+  │  🐛 Sidebar overflow   /dashboard  │
+  │  💡 Add dark mode      /settings   │
+  │  ❓ How do I export?   /reports    │
+  │  ───────────────────────────────    │
+  │  [Filter by category] [Search]      │
+  └─────────────────────────────────────┘
+```
+
+---
+
 ## Quick Start
 
 ### 1. Install
