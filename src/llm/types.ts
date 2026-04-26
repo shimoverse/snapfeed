@@ -25,9 +25,12 @@ export interface LLMFeatureToggles {
   severity?: boolean
   /** Extract reproducible steps from the payload. */
   repro?: boolean
-  /** Second-pass PII / secret redaction beyond the regex sweep. */
-  redact?: boolean
-  // dedupe + transcribe + route deferred to a later release
+  // `redact` (LLM second-pass redaction) was advertised in v0.4 but never
+  // implemented at the runner level — removed in v0.5.0 to avoid a
+  // security-flavored no-op. Use `redactBeforeLLM: true` (regex + entropy +
+  // email patterns) on the top-level LLMConfig instead. A real LLM-driven
+  // redact pass is planned for v0.6.
+  // dedupe + transcribe + route deferred to a later release.
 }
 
 export interface LLMConfig {

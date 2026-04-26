@@ -61,7 +61,10 @@ const HEADER_ROW = [
 ]
 
 const tokenCache = new Map<string, CachedToken>()
-const headerCheckedFor = new Set<string>()
+// Promise-cached header check, keyed by spreadsheetId+range. Concurrent
+// first-time `send()` calls share the same in-flight check, eliminating
+// the race that previously wrote the header row multiple times.
+const headerCheckPromises = new Map<string, Promise<void>>()
 
 function base64UrlEncode(input: string | Uint8Array): string {
   const buf =
@@ -229,12 +232,22 @@ export function googleSheetsAdapter(
       ]
 
       const doSend = async (token: string): Promise<Response> => {
-        if (createHeaderIfEmpty && !headerCheckedFor.has(headerKey)) {
-          const existing = await fetchValues(spreadsheetId, range, token)
-          if (existing && existing.length === 0) {
-            await appendValues(spreadsheetId, range, [HEADER_ROW], token)
+        if (createHeaderIfEmpty) {
+          // Promise-cached: every concurrent first-time call awaits the same
+          // header-check promise. On failure, drop the cache so the next call
+          // can retry.
+          let p = headerCheckPromises.get(headerKey)
+          if (!p) {
+            p = (async () => {
+              const existing = await fetchValues(spreadsheetId, range, token)
+              if (existing && existing.length === 0) {
+                await appendValues(spreadsheetId, range, [HEADER_ROW], token)
+              }
+            })()
+            headerCheckPromises.set(headerKey, p)
+            p.catch(() => headerCheckPromises.delete(headerKey))
           }
-          headerCheckedFor.add(headerKey)
+          await p
         }
         return appendValues(spreadsheetId, range, [row], token)
       }

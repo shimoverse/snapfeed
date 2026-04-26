@@ -62,7 +62,10 @@ services:
     volumes:
       - ./data/minio:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      # Use the bundled `mc` CLI — `curl` is NOT present in the minio image,
+      # so the previous curl-based healthcheck never passed and the worker
+      # (which depends on minio:service_healthy) would never start.
+      test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5

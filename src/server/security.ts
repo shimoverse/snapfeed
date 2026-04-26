@@ -32,6 +32,22 @@ interface MemoryEntry {
 
 const memoryStore = new Map<string, MemoryEntry>()
 
+// Cap the in-memory rate-limit store so a high-cardinality IP flood (or a
+// `x-forwarded-for` spoofing run) can't grow the map to GBs before the next
+// sweep. When at the cap we evict the oldest 10% of entries by resetAt.
+const RATE_LIMIT_MAX_KEYS = 10_000
+
+function evictIfFull() {
+  if (memoryStore.size < RATE_LIMIT_MAX_KEYS) return
+  const entries = Array.from(memoryStore.entries())
+  entries.sort((a, b) => a[1].resetAt - b[1].resetAt)
+  const evictCount = Math.ceil(entries.length / 10)
+  for (let i = 0; i < evictCount; i++) {
+    const entry = entries[i]
+    if (entry) memoryStore.delete(entry[0])
+  }
+}
+
 // Clean up expired entries every 5 minutes
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
@@ -48,6 +64,7 @@ export const defaultRateLimitStore: RateLimitStore = {
     const existing = memoryStore.get(key)
 
     if (!existing || existing.resetAt < now) {
+      evictIfFull()
       const entry: MemoryEntry = { count: 1, resetAt: now + windowMs }
       memoryStore.set(key, entry)
       return { count: 1, resetAt: entry.resetAt }
@@ -140,7 +157,11 @@ export function validatePayload(
   }
 
   // Sanitize metadata console errors — strip anything that looks like a secret
-  // (basic heuristic: lines containing "token", "key", "secret", "password", "bearer")
+  // (basic heuristic: lines containing "token", "key", "secret", "password", "bearer").
+  // We mutate in place into a NEW array so the caller's original payload
+  // object — which they may still hold references to — is not silently
+  // rewritten. Earlier code reassigned `meta.consoleErrors` to a mapped copy,
+  // which mutated the caller's metadata object too.
   if (payload.metadata && typeof payload.metadata === 'object') {
     const meta = payload.metadata as Record<string, unknown>
     if (Array.isArray(meta.consoleErrors)) {

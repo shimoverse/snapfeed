@@ -84,20 +84,25 @@ export function useFeedbackWidget(): UseFeedbackResult {
 
       setPhase('submitting')
       setError(null)
-      inFlight.current += 1
+      // Capture the submit id at the start. Phase transitions only fire when
+      // OUR id is still the latest — this prevents a slow earlier submit from
+      // overwriting the state of a faster later one. Earlier code compared
+      // `inFlight.current === 1` AFTER an increment, which incorrectly
+      // suppressed `'success'` on every concurrent submit.
+      const myId = ++inFlight.current
       try {
         await ctxSubmit(partial)
-        if (inFlight.current === 1) {
+        if (inFlight.current === myId) {
           setPhase('success')
         }
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err))
-        setError(e)
-        setPhase('error')
+        if (inFlight.current === myId) {
+          setError(e)
+          setPhase('error')
+        }
         // Re-throw so callers can also `.catch()` if they want.
         throw e
-      } finally {
-        inFlight.current -= 1
       }
     },
     [text, category, screenshot, config.user, ctxSubmit]

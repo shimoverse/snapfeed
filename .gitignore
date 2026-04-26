@@ -5,8 +5,19 @@ dist/
 .env
 .env.local
 
-# Docker stack runtime data
-docker/data/
+# Docker stack runtime data — but keep the .gitkeep placeholders so the dir
+# exists in fresh clones with the right ownership for bind mounts (see
+# docker/data/.gitkeep for the rationale).
+docker/data/*
+!docker/data/.gitkeep
+!docker/data/audit/
+!docker/data/audit/.gitkeep
+!docker/data/uploads/
+!docker/data/uploads/.gitkeep
+docker/data/audit/*
+!docker/data/audit/.gitkeep
+docker/data/uploads/*
+!docker/data/uploads/.gitkeep
 docker/.env
 
 # TypeScript incremental build info

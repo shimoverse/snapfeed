@@ -1,0 +1,8 @@
+# Pre-create the data dir so bind mounts inherit the right ownership on
+# first `docker compose up`. Without this, Compose creates `./data/` and its
+# subdirs as root (or the host-shell user), and the in-container `node` user
+# (UID 1000) cannot write to them — the worker crashes on the first audit-log
+# append with EACCES.
+#
+# If you still see EACCES errors:
+#   sudo chown -R 1000:1000 docker/data

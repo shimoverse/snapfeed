@@ -28,7 +28,7 @@
  * }))
  */
 
-import type { FeedbackHandlerConfig } from '../types'
+import type { FeedbackHandlerConfig, FeedbackAdapterResult } from '../types'
 import {
   checkRateLimit,
   validatePayload,
@@ -59,6 +59,26 @@ type ExpressMiddleware = (req: Request, res: Response, next: NextFn) => void | P
  */
 export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddleware {
   return async function handler(req: Request, res: Response, next: NextFn) {
+    // Audit log helper. Failures are caught and logged via `console.error` —
+    // audit logging never breaks the request flow.
+    const recordAudit = async (event: { type: string; [key: string]: unknown }) => {
+      if (!config.auditLog) return
+      try {
+        await config.auditLog.record({ ts: new Date().toISOString(), ...event })
+      } catch (e) {
+        console.error('[snapfeed] audit log failure:', e)
+      }
+    }
+
+    // Pull client IP — prefer the LAST hop in `x-forwarded-for` (the trusted
+    // proxy), not the first (attacker-controlled).
+    const forwardedFor = req.headers['x-forwarded-for']
+    const xff = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor
+    const lastHop = xff ? xff.split(',').pop()?.trim() : undefined
+    const realIpHeader = req.headers['x-real-ip']
+    const realIp = Array.isArray(realIpHeader) ? realIpHeader[0] : realIpHeader
+    const ip = req.ip ?? lastHop ?? realIp ?? 'unknown'
+
     try {
       // ── Origin check ────────────────────────────────────────────────────────
       const origin = Array.isArray(req.headers['origin'])
@@ -72,17 +92,11 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
 
       // ── Rate limiting ──────────────────────────────────────────────────────
       if (config.rateLimit) {
-        const forwardedFor = req.headers['x-forwarded-for']
-        const ip =
-          req.ip ??
-          (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]?.trim()) ??
-          req.headers['x-real-ip'] as string ??
-          'unknown'
-
         const { allowed, remaining, resetAt } = await checkRateLimit(ip, config)
         void remaining
 
         if (!allowed) {
+          await recordAudit({ type: 'rate_limit.hit', ip, key: ip })
           res
             .status(429)
             .set('Retry-After', String(Math.ceil((resetAt - Date.now()) / 1000)))
@@ -101,6 +115,15 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
 
       const normalized = normalizePayload(req.body)
 
+      await recordAudit({
+        type: 'feedback.received',
+        ip,
+        payloadSize: JSON.stringify(normalized).length,
+        pageUrl: normalized.pageUrl,
+        reporter: normalized.user?.email ?? normalized.user?.name,
+        category: normalized.category,
+      })
+
       // ── Optional pre-receive hook ──────────────────────────────────────────
       if (config.onReceive) {
         const allowed = await config.onReceive(normalized)
@@ -111,14 +134,27 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
       }
 
       // ── Run all adapters ───────────────────────────────────────────────────
+      const adapterStarts = config.adapters.map(() => Date.now())
       const results = await Promise.allSettled(
         config.adapters.map(adapter => adapter.send(normalized))
       )
 
-      const adapterResults = results.map((r, i) =>
-        r.status === 'fulfilled'
-          ? r.value
-          : { ok: false, error: String(r.reason), name: config.adapters[i]?.name }
+      const adapterResults: FeedbackAdapterResult[] = results.map((r) =>
+        r.status === 'fulfilled' ? r.value : { ok: false, error: String(r.reason) }
+      )
+
+      await Promise.all(
+        config.adapters.map((adapter, i) =>
+          recordAudit({
+            type: 'adapter.dispatched',
+            adapter: adapter.name,
+            ok: adapterResults[i]?.ok ?? false,
+            durationMs: Date.now() - (adapterStarts[i] ?? Date.now()),
+            deliveryId: adapterResults[i]?.deliveryId,
+            error: adapterResults[i]?.error,
+            warningsCount: adapterResults[i]?.warnings?.length ?? 0,
+          })
+        )
       )
 
       const anyOk = adapterResults.some(r => r.ok)

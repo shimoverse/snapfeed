@@ -203,6 +203,21 @@ export interface FeedbackHandlerConfig {
    */
   maxPayloadBytes?: number
   /**
+   * Optional audit log sink. When set, the handler emits structured events
+   * for `feedback.received`, `adapter.dispatched`, and `rate_limit.hit`.
+   * See `snapfeed/audit-log` for `fileAuditLog`, `noopAuditLog`, `multiAuditLog`.
+   *
+   * `record(event)` failures are caught and logged via `console.error` —
+   * audit logging never breaks the request flow.
+   */
+  auditLog?: {
+    record(event: {
+      type: string
+      ts: string
+      [key: string]: unknown
+    }): Promise<void> | void
+  }
+  /**
    * Max screenshot size in bytes (base64 decoded).
    * @default 5242880 (5MB)
    */

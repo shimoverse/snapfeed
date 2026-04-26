@@ -39,9 +39,22 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
   return {
     name: 'slack',
     async send(payload: FeedbackPayload): Promise<FeedbackAdapterResult> {
+      // Escape Slack mrkdwn control sequences in user-supplied text. Per Slack's
+      // documented escaping rules (api.slack.com/reference/surfaces/formatting#escaping),
+      // `<`, `>`, and `&` MUST be replaced with their HTML entities before being
+      // sent in any mrkdwn block. Without this, a feedback payload of
+      // `<!channel> ping` would page the entire workspace.
+      const safe = (s: string | undefined): string =>
+        (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
       const senderInfo = payload.user?.name
-        ? `${payload.user.name}${payload.user.email ? ` <${payload.user.email}>` : ''}`
+        ? `${safe(payload.user.name)}${payload.user.email ? ` <${safe(payload.user.email)}>` : ''}`
         : 'Anonymous'
+
+      const safeText = safe(payload.text)
+      const safePageName = safe(payload.pageName)
+      const safePageUrl = safe(payload.pageUrl)
+      const safeAppName = safe(payload.appName)
 
       const CATEGORY_EMOJIS: Record<string, string> = {
         bug: '🐛',
@@ -60,7 +73,7 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `🔧 ${payload.appName} Feedback${categoryLabel}`,
+            text: `🔧 ${safeAppName} Feedback${categoryLabel}`,
             emoji: true,
           },
         },
@@ -68,7 +81,7 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*"${payload.text}"*`,
+            text: `*"${safeText}"*`,
           },
         },
         {
@@ -88,11 +101,11 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
               : []),
             {
               type: 'mrkdwn',
-              text: `*Page:*\n${payload.pageName || payload.pageUrl}`,
+              text: `*Page:*\n${safePageName || safePageUrl}`,
             },
             {
               type: 'mrkdwn',
-              text: `*URL:*\n${payload.pageUrl}`,
+              text: `*URL:*\n${safePageUrl}`,
             },
             {
               type: 'mrkdwn',
@@ -108,7 +121,7 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
           elements: [
             {
               type: 'mrkdwn',
-              text: `*Viewport:* ${payload.metadata.viewport} | *UA:* ${payload.metadata.userAgent.slice(0, 80)}`,
+              text: `*Viewport:* ${safe(payload.metadata.viewport)} | *UA:* ${safe(payload.metadata.userAgent.slice(0, 80))}`,
             },
           ],
         })
@@ -119,7 +132,7 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Console Errors:*\n\`\`\`${payload.metadata.consoleErrors.slice(0, 5).join('\n')}\`\`\``,
+            text: `*Console Errors:*\n\`\`\`${payload.metadata.consoleErrors.slice(0, 5).map(safe).join('\n')}\`\`\``,
           },
         })
       }
@@ -128,7 +141,7 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
         username,
         icon_emoji: iconEmoji,
         blocks,
-        text: `New feedback from ${senderInfo} on ${payload.pageName || payload.pageUrl}: "${payload.text.slice(0, 100)}"`,
+        text: `New feedback from ${senderInfo} on ${safePageName || safePageUrl}: "${safeText.slice(0, 100)}"`,
       }
 
       if (channel) body.channel = channel

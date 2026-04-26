@@ -91,8 +91,7 @@ export async function applyLLM(
   if (!config.enabled) return result
 
   const features = config.features ?? {}
-  const anyFeature =
-    features.title || features.severity || features.repro || features.redact
+  const anyFeature = features.title || features.severity || features.repro
   if (!anyFeature) return result
 
   const provider = createProvider(config)
@@ -101,11 +100,16 @@ export async function applyLLM(
     return result
   }
 
-  const text = config.redactBeforeLLM ? redactForLLM(payload.text) : payload.text
-  const consoleErrors = (payload.metadata?.consoleErrors ?? []).map(e =>
-    config.redactBeforeLLM ? redactForLLM(e) : e
-  )
+  const maybeRedact = (s: string): string =>
+    config.redactBeforeLLM ? redactForLLM(s) : s
+
+  const text = maybeRedact(payload.text)
+  const consoleErrors = (payload.metadata?.consoleErrors ?? []).map(maybeRedact)
   const firstThreeErrors = consoleErrors.slice(0, 3)
+  // URLs commonly leak tokens / emails (`?api_key=…`, `?token=…`,
+  // `/users/foo@example.com/…`). Apply the same redaction pass so the LLM
+  // never sees them in the repro feature's user message.
+  const pageUrlSafe = maybeRedact(payload.pageUrl ?? '')
 
   const { budget, signal } = options
 
@@ -182,7 +186,7 @@ export async function applyLLM(
       try {
         const userMsg = [
           `Feedback: ${text}`,
-          payload.pageUrl ? `URL: ${payload.pageUrl}` : '',
+          pageUrlSafe ? `URL: ${pageUrlSafe}` : '',
           payload.metadata?.viewport ? `Viewport: ${payload.metadata.viewport}` : '',
         ]
           .filter(Boolean)

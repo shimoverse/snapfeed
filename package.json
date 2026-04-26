@@ -1,6 +1,6 @@
 {
   "name": "snapfeed",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice. Pluggable adapters: Slack, JIRA, Linear, Asana, ClickUp, Notion, MS Teams, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. BYOK LLM (Anthropic, OpenAI, Azure, Bedrock, Ollama). Routing config + Release Campaigns. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
   "author": "snapfeed contributors",
   "license": "MIT",

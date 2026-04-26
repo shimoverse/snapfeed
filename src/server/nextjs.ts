@@ -26,7 +26,7 @@
  * })
  */
 
-import type { FeedbackHandlerConfig } from '../types'
+import type { FeedbackHandlerConfig, FeedbackAdapterResult } from '../types'
 import {
   checkRateLimit,
   validatePayload,
@@ -61,6 +61,24 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
       }
     }
 
+    // Audit log helper. Failures are caught and logged via `console.error` —
+    // audit logging never breaks the request flow.
+    const recordAudit = async (event: { type: string; [key: string]: unknown }) => {
+      if (!config.auditLog) return
+      try {
+        await config.auditLog.record({ ts: new Date().toISOString(), ...event })
+      } catch (e) {
+        console.error('[snapfeed] audit log failure:', e)
+      }
+    }
+
+    // Pull client IP — prefer the LAST hop in `x-forwarded-for` (the trusted
+    // proxy), not the first (attacker-controlled). When `req.ip` is set by
+    // the platform (Vercel, etc.) it's the most trustworthy source.
+    const xff = req.headers.get('x-forwarded-for')
+    const lastHop = xff ? xff.split(',').pop()?.trim() : undefined
+    const ip = req.ip ?? lastHop ?? req.headers.get('x-real-ip') ?? 'unknown'
+
     // ── Origin check ──────────────────────────────────────────────────────────
     const origin = req.headers.get('origin')
     if (!checkOrigin(origin, config.allowedOrigins)) {
@@ -69,15 +87,10 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
 
     // ── Rate limiting ─────────────────────────────────────────────────────────
     if (config.rateLimit) {
-      const ip =
-        req.ip ??
-        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-        req.headers.get('x-real-ip') ??
-        'unknown'
-
       const { allowed, remaining, resetAt } = await checkRateLimit(ip, config)
 
       if (!allowed) {
+        await recordAudit({ type: 'rate_limit.hit', ip, key: ip })
         return NR.json(
           { error: 'Too many feedback submissions. Please wait a moment.' },
           {
@@ -110,6 +123,15 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
 
     const normalized = normalizePayload(body)
 
+    await recordAudit({
+      type: 'feedback.received',
+      ip,
+      payloadSize: JSON.stringify(normalized).length,
+      pageUrl: normalized.pageUrl,
+      reporter: normalized.user?.email ?? normalized.user?.name,
+      category: normalized.category,
+    })
+
     // ── Optional pre-receive hook ─────────────────────────────────────────────
     if (config.onReceive) {
       const allowed = await config.onReceive(normalized)
@@ -119,14 +141,28 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
     }
 
     // ── Run all adapters ──────────────────────────────────────────────────────
+    const adapterStarts = config.adapters.map(() => Date.now())
     const results = await Promise.allSettled(
       config.adapters.map(adapter => adapter.send(normalized))
     )
 
-    const adapterResults = results.map((r, i) =>
-      r.status === 'fulfilled'
-        ? r.value
-        : { ok: false, error: String(r.reason), name: config.adapters[i]?.name }
+    const adapterResults: FeedbackAdapterResult[] = results.map((r) =>
+      r.status === 'fulfilled' ? r.value : { ok: false, error: String(r.reason) }
+    )
+
+    // Emit one adapter.dispatched event per adapter, in parallel, fail-safe.
+    await Promise.all(
+      config.adapters.map((adapter, i) =>
+        recordAudit({
+          type: 'adapter.dispatched',
+          adapter: adapter.name,
+          ok: adapterResults[i]?.ok ?? false,
+          durationMs: Date.now() - (adapterStarts[i] ?? Date.now()),
+          deliveryId: adapterResults[i]?.deliveryId,
+          error: adapterResults[i]?.error,
+          warningsCount: adapterResults[i]?.warnings?.length ?? 0,
+        })
+      )
     )
 
     const anyOk = adapterResults.some(r => r.ok)

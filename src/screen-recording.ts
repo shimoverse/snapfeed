@@ -83,9 +83,14 @@ export function pickSupportedMimeType(preferred: string[]): string | null {
 
 // ─── Recorder ────────────────────────────────────────────────────────────────
 
+interface RawBlobLike {
+  size: number
+  type?: string
+}
+
 interface RawMediaRecorder {
   state: 'inactive' | 'recording' | 'paused'
-  ondataavailable: ((e: { data: { size: number } }) => void) | null
+  ondataavailable: ((e: { data: RawBlobLike }) => void) | null
   onstop: (() => void) | null
   onerror: ((e: unknown) => void) | null
   start(timeslice?: number): void
@@ -103,7 +108,13 @@ export function createScreenRecorder(options: ScreenRecorderOptions = {}): Scree
   let isRecording = false
   let stream: RawMediaStream | null = null
   let recorder: RawMediaRecorder | null = null
-  let chunks: { size: number; type?: string }[] = []
+  // Store the actual Blob objects from each `dataavailable` event. Earlier
+  // versions stored only `{ size, type }` metadata, which caused the final
+  // Blob constructor to serialize them as `"[object Object]"` and produce
+  // a meaningless recording. The Blob constructor accepts BlobPart[] which
+  // includes Blob, ArrayBuffer, and string — we keep `RawBlobLike` here
+  // because the DOM lib type isn't always in scope.
+  let chunks: RawBlobLike[] = []
   let mimeType = 'video/webm'
   let startedAt = 0
   let autoStopTimer: ReturnType<typeof setTimeout> | null = null
@@ -153,7 +164,10 @@ export function createScreenRecorder(options: ScreenRecorderOptions = {}): Scree
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
-          chunks.push({ size: e.data.size, type: chosen })
+          // Store the actual Blob (or BlobLike on test fakes) so the final
+          // Blob constructor can read its bytes. Storing metadata here used
+          // to discard the data entirely.
+          chunks.push(e.data)
         }
       }
 

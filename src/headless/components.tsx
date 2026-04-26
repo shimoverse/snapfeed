@@ -134,9 +134,16 @@ export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
   const { state, close } = useFeedbackWidget()
   const components = useFeedbackComponents()
 
+  // Always close the modal. The consumer's `onClose` callback is for THEIR
+  // side-effects (analytics, logging) — it does NOT replace the close
+  // behavior. Earlier code skipped `close()` when `onClose` was provided,
+  // which left the modal stuck open forever.
   const onClose = React.useCallback(() => {
-    props.onClose?.()
-    if (!props.onClose) close()
+    try {
+      props.onClose?.()
+    } finally {
+      close()
+    }
   }, [props, close])
 
   // ESC handler — only attached when the modal is mounted, removed on close.

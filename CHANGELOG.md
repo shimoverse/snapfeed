@@ -6,6 +6,105 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-04-26
+
+Pre-publish review pass. Six parallel code-review agents found and 13 critical
+issues + several high-priority hardening items were addressed before launch.
+No new features — bug fixes and security hardening only.
+
+### Fixed — security & correctness
+- **Slack mrkdwn injection** — `slackAdapter` now escapes `&`, `<`, `>` in
+  every user-supplied field (text, page name, page URL, app name, reporter,
+  console errors). Previously a feedback submission of `<!channel> ping`
+  would page the entire Slack workspace.
+- **Webhook SSRF guard** — `webhookAdapter` now requires `https://` URLs by
+  default and rejects invalid/non-allowed schemes at construction time. Pass
+  `allowInsecure: true` for `http://` (dev only). The JSDoc explicitly warns
+  consumers to never source `url` from request data.
+- **Google Sheets header-write race** — `googleSheetsAdapter` now uses a
+  promise-cached header check keyed by `spreadsheetId+range`, eliminating the
+  race that previously wrote the header row twice on concurrent first-time
+  calls.
+- **Audit log wired into both server handlers** — `FeedbackHandlerConfig`
+  now accepts `auditLog?: AuditLog`. Both `createFeedbackHandler` (Next.js)
+  and `feedbackMiddleware` (Express) emit `feedback.received`,
+  `adapter.dispatched`, and `rate_limit.hit` events. Previously the audit
+  log primitive existed but neither built-in handler called it; only
+  `docker/worker.cjs` wired it. Audit-log failures are caught and logged via
+  `console.error` — they never break the request flow.
+- **`x-forwarded-for` last-hop trust** — both server handlers now read the
+  LAST hop in `x-forwarded-for` (the trusted proxy), not the first
+  (attacker-controlled). A spoofed XFF header can no longer bypass per-IP
+  rate limiting.
+- **Rate-limit memory cap** — the in-memory rate-limit store now caps at
+  10,000 keys with a 10% LRU eviction, preventing memory blowup under
+  high-cardinality IP floods.
+- **`features.redact` removed** from the public LLM API. The toggle was
+  advertised in v0.4 but never implemented at the runner level — shipping a
+  security-flavored no-op was a footgun. Use `redactBeforeLLM: true`
+  (regex + entropy + email patterns) instead. A real LLM-driven redact pass
+  is planned for v0.6.
+- **LLM redacts `pageUrl` in repro feature** — URLs commonly leak tokens and
+  emails (`?api_key=…`, `/users/foo@example.com/…`); now sanitized through
+  the same `redactForLLM` pass as `text` and `consoleErrors`.
+
+### Fixed — correctness bugs
+- **`screen-recording.ts` records garbage** — chunks were typed as
+  `{ size, type? }` and stored only metadata; the final `Blob` constructor
+  serialized them as `[object Object]`, producing meaningless recordings.
+  Now stores actual `Blob` objects (matching the voice recorder pattern).
+- **`useFeedbackWidget.ts` inFlight ref** — concurrent submits could leave
+  the widget stuck in `'submitting'` state forever. The success transition
+  now uses a captured submit-id ("only fire if I'm still the latest") instead
+  of a buggy `inFlight === 1` check after increment.
+- **`FeedbackModal.onClose` was un-closeable** when a consumer wired their
+  own callback. Always calls `close()` now; the consumer's `onClose` runs
+  for side-effects only.
+- **`validatePayload` no longer mutates** the caller's `metadata.consoleErrors`
+  array — sanitization was leaking back into the consumer's reference.
+
+### Fixed — Docker stack
+- **MinIO healthcheck** uses `mc ready local` instead of `curl` (which is not
+  in the minio image). Previously the worker would never start because
+  `depends_on: minio: condition: service_healthy` waited on a check that
+  could never pass.
+- **Bind mount perms** — `docker/data/{audit,uploads}/` directories are
+  pre-created with `.gitkeep` so the in-container `node` user (UID 1000) can
+  write to them on first `docker compose up`.
+
+### Fixed — examples
+- **Next.js example `next build` was failing** because the client bundle
+  pulled in `fileAdapter` (which uses `await import('fs/promises')`).
+  `next.config.js` now sets `webpack.resolve.fallback` for `fs`, `path`,
+  `crypto`, and `node:*` variants.
+- **Remix `remix.config.js`** converted to ESM `export default` (was
+  `module.exports` in a `"type": "module"` package — failed on every
+  `npm run dev`).
+- **Admin `.gitignore`** now excludes `*.jsonl` so users don't accidentally
+  commit real feedback (text, screenshots, console errors, build context).
+- **Admin `.env.example`** comments out `SNAPFEED_ADMIN_BYPASS=1` so a
+  copy-paste of the example into production doesn't leave the admin app
+  wide open by default.
+
+### Verification at commit time
+- Build EXIT=0
+- Type-check EXIT=0
+- ESLint EXIT=0 (0 errors, 19 cosmetic warnings — same as v0.5.0 baseline)
+- Tests EXIT=0 — 470 pass + 12 skipped across 39 files
+- size-limit EXIT=0 — all 6 browser bundles well under 5KB budgets
+- npm audit EXIT=0 — `--audit-level=high --omit=dev`: 0 vulnerabilities
+
+### Findings deferred to v0.5.2 / v0.6
+- Several Medium/Low items from the pre-publish review were intentionally
+  not addressed in this patch. They're documented in
+  `docs/SECURITY_REPORT.md` (F-003 status flipped from "Open" to "Mitigated
+  in v0.5.0"; the v0.5.1 fixes above to be reflected by maintainer review).
+- v0.6 work: combine LLM title+severity+repro into one provider call,
+  extract shared adapter helpers (base64, http, escape, categories), shared
+  fetch-with-timeout, third-party SigV4 audit, jsdom-based React component
+  tests, Postgres-backed admin store, image-digest pinning, SBOM per release,
+  full WCAG 2.1 AA pass.
+
 ## [0.5.0] — 2026-04-26
 
 ### Added — Customization layer
