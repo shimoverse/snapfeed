@@ -1,7 +1,7 @@
 {
   "name": "snapfeed",
-  "version": "0.1.0",
-  "description": "Drop-in developer feedback widget for React/Next.js. Hotkey-activated, screenshot support, pluggable adapters (Supabase, Telegram, Slack, webhook).",
+  "version": "0.3.0",
+  "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice (planned). Pluggable adapters: Slack, JIRA, Linear, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
   "author": "snapfeed contributors",
   "license": "MIT",
   "keywords": [
@@ -11,9 +11,20 @@
     "nextjs",
     "developer-tools",
     "devtools",
+    "dogfooding",
+    "internal-feedback",
+    "qa",
+    "beta-testing",
+    "screenshot",
+    "annotation",
+    "slack",
+    "jira",
+    "linear",
+    "github-issues",
+    "discord",
+    "google-sheets",
     "supabase",
     "telegram",
-    "screenshot",
     "snapfeed"
   ],
   "repository": {
@@ -28,6 +39,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "snapfeed": "./dist/cli.cjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -38,6 +52,11 @@
       "types": "./dist/adapters/index.d.ts",
       "import": "./dist/adapters/index.mjs",
       "require": "./dist/adapters/index.cjs"
+    },
+    "./routing": {
+      "types": "./dist/routing.d.ts",
+      "import": "./dist/routing.mjs",
+      "require": "./dist/routing.cjs"
     },
     "./server/nextjs": {
       "types": "./dist/server/nextjs.d.ts",
@@ -52,13 +71,21 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run type-check"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build && npm run type-check && npm test"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -73,10 +100,12 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
   },
   "optionalDependencies": {
     "html2canvas": "^1.4.1"

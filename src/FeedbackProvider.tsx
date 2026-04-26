@@ -16,6 +16,7 @@ import type {
   FeedbackMetadata,
 } from './types'
 import { FeedbackWidget } from './FeedbackWidget'
+import { summarizeAdapterResults } from './lib/adapter-results'
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -159,13 +160,22 @@ export function FeedbackProvider({
 
       // If adapters are configured directly, call them
       if (mergedConfig.adapters && mergedConfig.adapters.length > 0) {
+        const adapters = mergedConfig.adapters
         const results = await Promise.allSettled(
-          mergedConfig.adapters.map(adapter => adapter.send(payload))
+          adapters.map(adapter => adapter.send(payload))
         )
-        const anyFailed = results.every(
-          r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
-        )
-        if (anyFailed) {
+        const summary = summarizeAdapterResults(results)
+
+        if (summary.someFailed && !summary.allFailed) {
+          // Partial failure — surface so the caller knows even though
+          // the submission counts as delivered.
+          const detail = summary.failures
+            .map(f => `${adapters[f.index]?.name ?? '?'}: ${f.error}`)
+            .join('; ')
+          console.warn(`[snapfeed] Some adapters failed: ${detail}`)
+        }
+
+        if (summary.allFailed) {
           throw new Error('All adapters failed to deliver feedback')
         }
         return

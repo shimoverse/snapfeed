@@ -16,6 +16,24 @@ export type { SupabaseAdapterOptions } from './supabase'
 export { githubAdapter } from './github'
 export type { GitHubAdapterOptions } from './github'
 
+export { fileAdapter } from './file'
+export type { FileAdapterOptions } from './file'
+
+export { discordAdapter } from './discord'
+export type { DiscordAdapterOptions } from './discord'
+
+export { autoAdapters, AutoEnvKeys } from './auto'
+export type { AutoEnvKey } from './auto'
+
+export { jiraAdapter } from './jira'
+export type { JiraAdapterOptions } from './jira'
+
+export { linearAdapter } from './linear'
+export type { LinearAdapterOptions } from './linear'
+
+export { googleSheetsAdapter } from './googleSheets'
+export type { GoogleSheetsAdapterOptions } from './googleSheets'
+
 export type {
   FeedbackAdapter,
   FeedbackAdapterResult,

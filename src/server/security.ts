@@ -7,6 +7,22 @@
 
 import type { FeedbackHandlerConfig, FeedbackPayload, RateLimitStore } from '../types'
 
+// ─── Cross-runtime UTF-8 byte length ─────────────────────────────────────────
+// Vercel Edge, Cloudflare Workers, Deno, and browsers do not expose `Buffer`
+// as a global. Prefer `TextEncoder` (a Web Platform standard available
+// everywhere modern), and fall back to `Buffer` only when it exists (Node).
+function utf8ByteLength(input: string): number {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(input).length
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.byteLength(input, 'utf8')
+  }
+  // Last-resort approximation: 1 byte per char. Only reached on truly exotic
+  // runtimes; we'd rather under-validate than throw.
+  return input.length
+}
+
 // ─── In-memory rate limit store (single instance) ────────────────────────────
 
 interface MemoryEntry {
@@ -97,10 +113,8 @@ export function validatePayload(
 
   // Payload size check (text + metadata, not screenshot)
   const maxPayload = config.maxPayloadBytes ?? 10_000
-  const textSize = Buffer.byteLength(payload.text as string, 'utf8')
-  const metaSize = payload.metadata
-    ? Buffer.byteLength(JSON.stringify(payload.metadata), 'utf8')
-    : 0
+  const textSize = utf8ByteLength(payload.text as string)
+  const metaSize = payload.metadata ? utf8ByteLength(JSON.stringify(payload.metadata)) : 0
 
   if (textSize + metaSize > maxPayload) {
     return {

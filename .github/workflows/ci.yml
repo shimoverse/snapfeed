@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Build, type-check, test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Type-check
+        run: npm run type-check
+
+      # --if-present so this passes when the test script is missing
+      - name: Test
+        run: npm test --if-present
+
+      # Audit runs but does not block CI — findings are surfaced in the log
+      # and addressed in a follow-up PR. Adjust to remove continue-on-error
+      # once the dependency tree is clean.
+      - name: Audit (non-blocking)
+        run: npm audit --audit-level=high --omit=dev
+        continue-on-error: true

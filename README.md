@@ -1,1009 +1,262 @@
 # snapfeed
 
-A plug-and-play developer feedback widget for React apps. Drop it in, get a polished modal with screenshot support, and wire it to Supabase, Telegram, Slack, or any webhook — in under 5 minutes.
+> One-tap feedback for internal dogfooding. See it → tap → talk → done.
 
----
+[![npm](https://img.shields.io/npm/v/snapfeed.svg)](https://www.npmjs.com/package/snapfeed)
+[![license](https://img.shields.io/npm/l/snapfeed.svg)](./LICENSE)
+[![CI](https://github.com/shimoverse/snapfeed/actions/workflows/ci.yml/badge.svg)](https://github.com/shimoverse/snapfeed/actions)
+[![types](https://img.shields.io/badge/types-built--in-blue)](#)
 
-## Features
+snapfeed is the feedback widget for the people *inside* your build — testers, employees, peers, beta users. The kind who shouldn't have to pick a category, write a polished description, guess who owns the feature, choose between Slack and JIRA, and format a ticket properly. They press a hotkey, type or talk, hit send. snapfeed handles routing, formatting, and context attachment.
 
-- 🎯 **Hotkey toggle** — default `Ctrl+Shift+F`, fully configurable
-- 📸 **Screenshot support** — paste from clipboard, drag-and-drop, file picker, or auto-capture via html2canvas
-- ✏️ **Annotation layer** — annotate screenshots before submitting (pen, rectangle, arrow, highlighter)
-- 🏷️ **Category tags** — Bug, Idea, Question, Praise, Other chips on the form
-- 🔌 **Adapter system** — chain multiple backends (Supabase + Telegram + Slack + GitHub Issues + webhooks)
-- 📥 **FeedbackInbox** — full admin panel component to browse, filter, sort, and resolve submissions
-- 🎨 **Zero CSS dependencies** — all styles are inline (no Tailwind, no CSS modules, no external stylesheets)
-- 🌗 **Dark mode** — auto-detects system preference, or set manually
-- 🎨 **Themeable** — configure accent color and position
-- 📦 **Tiny footprint** — core widget ~12KB gzipped (html2canvas is optional/lazy-loaded)
-- 🔒 **Production-safe** — disabled in production by default; set `enableInProduction` to unlock
-- ⌨️ **Full keyboard support** — Escape to close, Ctrl+Enter to submit
-- 🖥️ **Server helpers** — drop-in handlers for Next.js App Router and Express
-- 📱 **Responsive** — works on mobile (hotkeys don't, but the button and modal do)
+Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your own team to actually file bugs while they're testing — keep reading.
 
----
+## Pick your mode
 
-## Who Is This For?
+| Mode | For | Setup |
+|------|-----|-------|
+| 🚀 Cloud-relayed | Indie / hackathon / small startup | 5 min |
+| 🏢 Self-hosted | Startup → mid-size | 30 min |
+| 🔒 Air-gapped | Corp / regulated | 1-2 weeks (incl. security review) |
 
-| Role | How they use snapfeed |
-|------|----------------------|
-| 🧑‍💼 **Product Manager** | Test features in staging, flag UX issues without leaving the browser |
-| 🧪 **QA Engineer** | File bugs with auto-captured screenshots and console errors attached |
-| 👨‍💻 **Developer** | Hotkey-activated during local dev — never context-switch to Jira mid-flow |
-| 🎨 **Designer** | Annotate screenshots and mark exactly what looks off |
-| 🚀 **Founder / Solo builder** | Ship fast, get real-time feedback from beta users without a support tool |
+Same widget. Different backend topology. Pick based on what your IT will approve.
 
----
-
-## User Journeys
-
-### 🧑‍💼 Product Manager — Reviewing a staging build
-
-```
-Sarah is reviewing the new checkout flow on staging before sign-off.
-She hits a confusing UX on the payment step.
-```
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Sarah opens staging.myapp.com                      │
-│                                                     │
-│  Step 1 ─── Navigates to Checkout > Payment step   │
-│                                                     │
-│  Step 2 ─── Spots confusing label on "Save card"   │
-│             checkbox — it's ambiguous               │
-│                                                     │
-│  Step 3 ─── Presses Ctrl+Shift+F                   │
-│             ↓                                       │
-│  ┌─────────────────────────┐                        │
-│  │ 💡 Idea  🐛 Bug  ❓ Q   │  ← picks 💡 Idea      │
-│  │─────────────────────────│                        │
-│  │ 📍 Checkout / Payment   │                        │
-│  │                         │                        │
-│  │ "Save card" checkbox    │                        │
-│  │ copy is confusing —     │                        │
-│  │ does it save for this   │                        │
-│  │ session or permanently? │                        │
-│  │                         │                        │
-│  │ [📎 Attach screenshot]  │                        │
-│  │         [Send Feedback] │                        │
-│  └─────────────────────────┘                        │
-│                                                     │
-│  Step 4 ─── Pastes screenshot (⌘V)                 │
-│             Clicks ✏️ Annotate                      │
-│             Draws red arrow pointing at checkbox    │
-│                                                     │
-│  Step 5 ─── Clicks Send Feedback                   │
-│                                                     │
-│  Step 6 ─── Dev gets Slack/Telegram notification:  │
-│             "💡 Idea — Checkout/Payment             │
-│              Save card checkbox copy is confusing…" │
-│             + annotated screenshot attached         │
-└─────────────────────────────────────────────────────┘
-```
-
-**What Sarah never had to do:** Open Jira. Screenshot separately. Copy a URL. Write a ticket. Explain which page.
-
----
-
-### 🧪 QA Engineer — Filing a bug during test run
-
-```
-Alex is running regression tests on the dashboard. 
-A chart fails to load on Firefox. Time to log it.
-```
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Alex opens app in Firefox, navigates to Dashboard  │
-│                                                     │
-│  Step 1 ─── Chart throws a JS error in console     │
-│             (snapfeed auto-captures it)             │
-│                                                     │
-│  Step 2 ─── Presses Ctrl+Shift+F                   │
-│                                                     │
-│  Step 3 ─── Selects 🐛 Bug category               │
-│                                                     │
-│  Step 4 ─── Types:                                 │
-│             "Revenue chart not rendering on         │
-│              Firefox 121. Console shows             │
-│              TypeError: d3 is not defined."         │
-│                                                     │
-│  Step 5 ─── snapfeed has already:                  │
-│             ✓ Captured current URL                  │
-│             ✓ Noted viewport: 1440x900              │
-│             ✓ Logged browser: Firefox 121           │
-│             ✓ Captured the console error            │
-│                                                     │
-│  Step 6 ─── Clicks Send                            │
-│                                                     │
-│  Result: GitHub Issue created automatically        │
-│  ┌─────────────────────────────────────────┐       │
-│  │ [Bug] 🐛 Revenue chart not rendering…   │       │
-│  │ Page: /dashboard                        │       │
-│  │ Browser: Firefox 121 / 1440x900         │       │
-│  │ Console error: TypeError: d3 is not…    │       │
-│  │ Labels: bug, dashboard                  │       │
-│  └─────────────────────────────────────────┘       │
-└─────────────────────────────────────────────────────┘
-```
-
-**What Alex never had to do:** Copy-paste the URL. Look up the browser version. Re-type the console error. Manually attach metadata.
-
----
-
-### 👨‍💻 Developer — Catching your own bug mid-build
-
-```
-Dev is building a new feature on localhost:3000.
-Spots a layout issue on mobile viewport while testing.
-```
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Dev resizes browser to 375px (iPhone)             │
-│                                                     │
-│  Sidebar overflows — overlaps main content         │
-│                                                     │
-│  Ctrl+Shift+F  →  Widget opens                     │
-│                                                     │
-│  autoScreenshot: true fires html2canvas            │
-│  Screenshot auto-attached ✓                        │
-│                                                     │
-│  Types: "Sidebar overflow at <768px breakpoint"    │
-│  Selects 🐛 Bug                                    │
-│  Clicks ✏️ Annotate → draws red box on sidebar    │
-│  Sends                                             │
-│                                                     │
-│  consoleAdapter() logs to terminal:                │
-│  {                                                 │
-│    text: "Sidebar overflow at <768px...",          │
-│    category: "bug",                                │
-│    pageUrl: "localhost:3000/dashboard",            │
-│    metadata: { viewport: "375x812", ... }          │
-│    screenshot: { base64: "...", mimeType: "..."  } │
-│  }                                                 │
-│                                                     │
-│  → Creates GitHub issue or Slack message           │
-│    without leaving the browser                     │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-### 🚀 Beta launch — Collecting user feedback
-
-```
-You've shipped a beta. You want real users to report
-issues without a support form or Intercom subscription.
-```
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Enable snapfeed for beta users only:              │
-│                                                     │
-│  <FeedbackProvider                                 │
-│    enableInProduction={true}                       │
-│    user={{ name: session.user.name,                │
-│             email: session.user.email }}           │
-│    apiUrl="/api/feedback"                          │
-│  >                                                 │
-│                                                     │
-│  Beta user hits a broken page                      │
-│  Clicks the "Feedback" button (bottom-right)       │
-│  Fills form, pastes screenshot                     │
-│  Hits Send                                         │
-│                                                     │
-│  You get:                                          │
-│  ┌─────────────────────────────────────────┐       │
-│  │ Telegram message (instant):             │       │
-│  │ 🔧 MyApp Feedback                       │       │
-│  │ From: Alex Chen (alex@example.com)      │       │
-│  │ Page: Settings / Billing                │       │
-│  │ "The upgrade button does nothing on     │       │
-│  │  Safari — no error, just hangs"         │       │
-│  └─────────────────────────────────────────┘       │
-│                                                     │
-│  + row in Supabase feedback table                  │
-│  + GitHub issue (if githubAdapter configured)      │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Use Cases
-
-| Scenario | Recommended setup |
-|----------|------------------|
-| **Solo dev / side project** | `consoleAdapter()` locally, `telegramAdapter()` in staging |
-| **Startup in beta** | `supabaseAdapter` + `telegramAdapter` + `enableInProduction: true` for beta users |
-| **Agency / client work** | `slackAdapter` — feedback lands in the client's Slack channel |
-| **Open-source project** | `githubAdapter` — submissions become GitHub issues automatically |
-| **Enterprise SaaS** | `webhookAdapter` → your internal bug tracker (Jira, Linear, etc.) |
-| **QA team** | `supabaseAdapter` + `<FeedbackInbox />` on `/admin/feedback` for triage |
-| **Design review** | Annotation layer + `slackAdapter` → screenshot with drawings goes to #design |
-
----
-
-## The Full Loop (End to End)
-
-```
-TESTER / PM / USER                    YOUR BACKEND
-──────────────────                    ────────────
-
-  Opens app on any page
-        │
-        ▼
-  Ctrl+Shift+F (or clicks button)
-        │
-        ▼
-  ┌─────────────────────┐
-  │  snapfeed widget    │
-  │  ─────────────────  │
-  │  Category: 🐛 Bug   │
-  │  Text: [........]   │
-  │  Screenshot: [img]  │
-  │  [Send Feedback]    │
-  └────────┬────────────┘
-           │ POST /api/feedback
-           ▼
-  ┌─────────────────────┐             ┌──────────────┐
-  │  Server handler     │────────────▶│  Supabase DB │
-  │  (Next.js/Express)  │             │  (persisted) │
-  └────────┬────────────┘             └──────────────┘
-           │
-           ├──────────────────────────▶ Telegram / Slack
-           │                            (instant notification)
-           │
-           └──────────────────────────▶ GitHub Issue
-                                        (auto-created)
-
-  ──────────────────────────────────────────────────
-  
-  Dev / PM opens /admin/feedback
-        │
-        ▼
-  ┌─────────────────────────────────────┐
-  │  <FeedbackInbox />                  │
-  │  ───────────────────────────────    │
-  │  🐛 Sidebar overflow   /dashboard  │
-  │  💡 Add dark mode      /settings   │
-  │  ❓ How do I export?   /reports    │
-  │  ───────────────────────────────    │
-  │  [Filter by category] [Search]      │
-  └─────────────────────────────────────┘
-```
-
----
-
-## Quick Start
-
-### 1. Install
+## 60-second quickstart (zero config)
 
 ```bash
 npm install snapfeed
-# or
-yarn add snapfeed
-# or
-pnpm add snapfeed
+npx snapfeed init --yes
+npm run dev
 ```
 
-### 2. Wrap your app
+Press **Ctrl+Shift+F**. Feedback dumps to `./feedback.jsonl` and your browser console. No env vars, no adapters, no signup.
 
-```tsx
-// app/layout.tsx (Next.js App Router)
-import { FeedbackProvider } from 'snapfeed'
-import { consoleAdapter } from 'snapfeed/adapters'
+When you're ready to wire a real destination:
 
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        <FeedbackProvider
-          appName="My App"
-          adapters={[consoleAdapter()]} // logs to console for local testing
-        >
-          {children}
-        </FeedbackProvider>
-      </body>
-    </html>
-  )
-}
+```bash
+echo 'SNAPFEED_SLACK_WEBHOOK=https://hooks.slack.com/...' >> .env.local
 ```
 
-### 3. Try it
+Restart. Done. The auto-adapter detects the env var and routes there.
 
-Open your app and press **Ctrl+Shift+F** (or Cmd+Shift+F on Mac). A feedback modal appears. Done.
+## What it does (the customer journey)
 
-For production, swap `consoleAdapter()` for a real backend — see [Adapters](#adapters) and [Server Helpers](#server-helpers).
+**Reporter — Ananya, designer reviewing a staging build.** She spots a confusing checkbox label on the payment step. Ctrl+Shift+F. Types one sentence, pastes a screenshot, draws a red arrow. Send. She never opened JIRA, never picked a project, never tagged a team.
 
----
+**PM — Raj, owns checkout.** Two minutes later the bug shows up in `#checkout-feedback` on Slack with screenshot, URL, viewport, and build ID. The same item is a JIRA ticket in his project, pre-labeled `bug` and `checkout`. He didn't file it himself.
 
-## FeedbackProvider Props
+**Engineer — Mei, on-call for payments.** Her JIRA ticket already has the console error, the user agent (Firefox 121 / Windows), and a link to the build. No "what browser were you on?" round-trip. She reproduces in five minutes.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `appName` | `string` | `"App"` | App name shown in the UI and in notifications |
-| `hotkey` | `string` | `"ctrl+shift+f"` | Keyboard shortcut to toggle widget. Format: `"ctrl+shift+f"`, `"meta+k"`, etc. |
-| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Position of the floating trigger button |
-| `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | Color theme. `auto` detects system preference |
-| `accentColor` | `string` | `"#D4714B"` | Primary color for buttons, focus rings, and accents |
-| `adapters` | `FeedbackAdapter[]` | `[]` | Client-side adapters. When provided, feedback is sent directly from the browser |
-| `apiUrl` | `string` | `"/api/feedback"` | Server API URL. Used when `adapters` is empty — recommended for production |
-| `collectMetadata` | `boolean` | `true` | Auto-collect viewport size, user agent, and console errors |
-| `autoScreenshot` | `boolean` | `false` | Auto-capture screenshot when widget opens (requires `html2canvas`) |
-| `enableInProduction` | `boolean` | `false` | Show widget in production. Disabled by default for safety |
-| `user` | `{ name?: string; email?: string }` | — | User context attached to every submission |
-| `onSuccess` | `(payload) => void` | — | Called after successful submission |
-| `onError` | `(error) => void` | — | Called when submission fails |
+**Release manager — Kenji, shipping Friday.** He opens the admin page (or the Slack channel) and sees twelve items from this week's beta cohort. Filters by team, marks four resolved, exports the rest as CSV for the retro. The widget never appeared for end customers — `enableInProduction: false` plus a role check on his side.
 
----
+## The three modes in detail
 
-## useDevFeedback Hook
-
-Programmatic control of the widget from anywhere inside `<FeedbackProvider>`.
-
-```tsx
-import { useDevFeedback } from 'snapfeed'
-
-function MyComponent() {
-  const { open, close, toggle, submit, isOpen } = useDevFeedback()
-
-  return (
-    <button onClick={open}>
-      {isOpen ? 'Close feedback' : 'Open feedback'}
-    </button>
-  )
-}
-```
-
-### Hook return values
-
-| Value | Type | Description |
-|-------|------|-------------|
-| `isOpen` | `boolean` | Whether the widget is currently visible |
-| `open` | `() => void` | Show the widget |
-| `close` | `() => void` | Hide the widget |
-| `toggle` | `() => void` | Toggle visibility |
-| `submit` | `(partial) => Promise<void>` | Submit feedback programmatically |
-| `config` | `object` | The resolved provider config |
-
-### Programmatic submit
-
-```tsx
-await submit({
-  text: 'The chart is broken on mobile',
-  pageUrl: window.location.href,
-  pageName: 'Dashboard',
-  screenshot: { base64: '...', mimeType: 'image/png' }, // optional
-})
-```
-
----
-
-## FeedbackButton Component
-
-A standalone trigger button. Use as a floating FAB or inline in a nav.
-
-```tsx
-import { FeedbackButton } from 'snapfeed'
-
-// Floating button (default)
-<FeedbackButton />
-
-// Inline in a sidebar
-<FeedbackButton inline label="Send feedback" />
-
-// Custom styling
-<FeedbackButton inline style={{ borderRadius: '4px' }} />
-```
-
-### FeedbackButton Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `inline` | `boolean` | `false` | Render inline (in document flow) instead of fixed |
-| `label` | `string` | `"Feedback"` | Button label text |
-| `className` | `string` | — | Custom CSS class |
-| `style` | `CSSProperties` | — | Custom inline styles |
-
----
-
-## Adapters
-
-Adapters receive every submitted `FeedbackPayload` and deliver it somewhere. You can chain multiple — all run in parallel.
-
-### Console adapter (dev/testing)
-
-```ts
-import { consoleAdapter } from 'snapfeed/adapters'
-
-consoleAdapter()
-consoleAdapter({ level: 'info', pretty: true })
-```
-
-### Supabase adapter
-
-```ts
-import { supabaseAdapter } from 'snapfeed/adapters'
-
-// Client-side (anon key)
-supabaseAdapter({
-  url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  table: 'feedback', // default
-})
-
-// Server-side (service role key — recommended)
-supabaseAdapter({
-  url: process.env.SUPABASE_URL!,
-  serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-})
-```
-
-**Required SQL schema:**
-
-```sql
-CREATE TABLE feedback (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  app_name text NOT NULL,
-  text text NOT NULL,
-  page_name text,
-  page_url text,
-  sender text,
-  sender_email text,
-  image_base64 text,
-  image_mime_type text,
-  metadata jsonb,
-  delivered boolean DEFAULT false,
-  delivery_channel text,
-  delivery_id text,
-  category text,         -- 'bug' | 'idea' | 'question' | 'praise' | 'other'
-  resolved boolean DEFAULT false
-);
-
--- Optional: enable RLS
-ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
-
--- Allow service role (used by server adapters)
--- No policy needed for service role — it bypasses RLS by default
-
--- Allow anon insert if using client-side adapter
-CREATE POLICY "Allow anon insert" ON feedback
-  FOR INSERT TO anon WITH CHECK (true);
-```
-
-If you have an existing `feedback` table, add the new columns:
-
-```sql
-ALTER TABLE feedback
-  ADD COLUMN IF NOT EXISTS category text,
-  ADD COLUMN IF NOT EXISTS resolved boolean DEFAULT false;
-```
-
-### Telegram adapter
-
-```ts
-import { telegramAdapter } from 'snapfeed/adapters'
-
-telegramAdapter({
-  botToken: process.env.TELEGRAM_BOT_TOKEN!,
-  chatId: process.env.TELEGRAM_CHAT_ID!, // group chat id (with leading -)
-  sendScreenshot: true, // default: true
-})
-```
-
-Sends a formatted HTML message:
-```
-🔧 MyApp Feedback
-From: Jane
-Page: Dashboard /dashboard
-
-Something is broken on this page.
-
-Viewport: 1440x900
-```
-
-### Slack adapter
-
-```ts
-import { slackAdapter } from 'snapfeed/adapters'
-
-slackAdapter({
-  webhookUrl: 'https://hooks.slack.com/services/T.../B.../...',
-  username: 'Feedback Bot',      // optional
-  iconEmoji: ':pencil:',          // optional
-})
-```
-
-### Webhook adapter
-
-Posts the full `FeedbackPayload` as JSON to any URL.
-
-```ts
-import { webhookAdapter } from 'snapfeed/adapters'
-
-webhookAdapter({
-  url: 'https://your-api.com/feedback',
-  headers: { 'Authorization': 'Bearer your-token' },
-  timeoutMs: 10000, // default
-  transform: (payload) => ({ ...payload, source: 'devtools-feedback' }), // optional
-})
-```
-
-### GitHub Issues adapter
-
-Creates a GitHub issue for each feedback submission. **Server-side only** — never expose your token to the browser.
-
-```ts
-import { githubAdapter } from 'snapfeed/adapters'
-
-githubAdapter({
-  token: process.env.GITHUB_TOKEN!,     // Personal Access Token with issues:write scope
-  owner: 'my-org',                      // GitHub owner or username
-  repo: 'my-app',                       // Repository name
-  labels: ['feedback', 'user-report'],  // Default labels (optional)
-  assignees: ['myusername'],            // Default assignees (optional)
-})
-```
-
-**What it creates:**
-
-- **Title:** `[Feedback] 🐛 Something is broken on the...`
-- **Body:** Formatted markdown with full text, page URL, sender info, viewport, user agent, console errors, and a note about the screenshot (stored in your primary adapter like Supabase)
-- **Labels:** Your default labels + a category label (`bug`, `enhancement`, `question`, `feedback`)
-- **Category-to-label mapping:** `bug → bug`, `idea → enhancement`, `question → question`, `praise/other → feedback`
-
-Use this in a server-side handler (Next.js API route or Express middleware):
+### 🚀 Cloud-relayed
+For indies, hackathon teams, small startups who want zero infra. Browser → widget → adapter (Slack webhook / GitHub API / Discord webhook) directly. No snapfeed-operated relay. One `npm install`, one env var, restart.
 
 ```ts
 // app/api/feedback/route.ts
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
+import { autoAdapters } from 'snapfeed/adapters'
+
+export const POST = createFeedbackHandler({ adapters: autoAdapters() })
+```
+
+### 🏢 Self-hosted
+For startups and mid-size teams that want their own database, their own LLM key, no third-party data path. You run a Next.js (or Express) API route + Postgres + S3-compatible blob store for screenshots + optional Ollama for local LLM. Security defaults are on: origin allowlist, rate limit, payload caps, console-error redaction.
+
+Today (v0.3), self-hosting = write a thin handler with `createFeedbackHandler`, point it at Supabase or your own webhook. The full Docker compose stack (Postgres + admin UI + worker) ships in **v0.5**.
+
+```ts
+// app/api/feedback/route.ts
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
+import { supabaseAdapter, slackAdapter } from 'snapfeed/adapters'
+
 export const POST = createFeedbackHandler({
   adapters: [
-    supabaseAdapter({ url: process.env.SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
-    githubAdapter({ token: process.env.GITHUB_TOKEN!, owner: 'my-org', repo: 'my-app' }),
+    supabaseAdapter({
+      url: process.env.SUPABASE_URL!,
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    }),
+    slackAdapter({ webhookUrl: process.env.SLACK_WEBHOOK! }),
   ],
+  rateLimit: { max: 10, windowMs: 60_000 },
+  allowedOrigins: ['https://staging.myapp.com', /\.myapp\.com$/],
 })
 ```
 
-### Custom adapter
+### 🔒 Air-gapped
+For corporates and regulated industries where every new outbound domain needs a security review. The library is already air-gappable today: configure only `webhookAdapter` (pointed at your internal bug tracker) and `fileAdapter`. Disable the auto-adapter so no env var can leak an outbound destination. Self-host with no LLM. The full air-gapped install guide and signed offline tarball ship in **v0.5**. See [SECURITY.md](./SECURITY.md).
 
-Implement the `FeedbackAdapter` interface:
+## Persona picker
+
+| Persona | Most likely destinations | Most likely mode |
+|---------|--------------------------|------------------|
+| Indie / OSS maintainer | GitHub Issues, Discord, file | Cloud-relayed |
+| Startup founder/PM | Slack, Linear, Sheet | Cloud-relayed → Self-hosted |
+| Mid-size eng manager | Slack, JIRA, Postgres | Self-hosted |
+| Corp eng / QA lead | JIRA, ServiceNow, MS Teams | Air-gapped |
+| Designer (any team) | Whatever their team set up | n/a — they just press the hotkey |
+
+## Configuration
+
+### Provider props
+
+```tsx
+import { FeedbackProvider } from 'snapfeed'
+
+<FeedbackProvider appName="Checkout" hotkey="ctrl+shift+f">
+  {children}
+</FeedbackProvider>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `appName` | `string` | `"App"` | Shown in UI and in adapter notifications |
+| `hotkey` | `string` | `"ctrl+shift+f"` | Format: `"ctrl+shift+f"`, `"meta+k"`, `"ctrl+alt+b"` |
+| `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Floating trigger position |
+| `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | Color theme; `auto` follows system |
+| `accentColor` | `string` | `"#D4714B"` | Accent color for buttons and focus rings |
+| `adapters` | `FeedbackAdapter[]` | `[]` | Client-side adapters. Skipped when `apiUrl` is in use |
+| `apiUrl` | `string` | `"/api/feedback"` | Server route the widget POSTs to (recommended for prod) |
+| `collectMetadata` | `boolean` | `true` | Auto-collect viewport, UA, console errors |
+| `autoScreenshot` | `boolean` | `false` | Capture screenshot on open via `html2canvas` |
+| `enableInProduction` | `boolean` | `false` | Show widget in prod (off by default — safety rail) |
+| `user` | `{ name?: string; email?: string }` | — | Reporter identity attached to every submission |
+| `onSuccess` | `(payload) => void` | — | Called after successful submission |
+| `onError` | `(error) => void` | — | Called when submission fails |
+
+### Identifying the reporter
+
+```tsx
+<FeedbackProvider
+  appName="Checkout"
+  user={{ name: 'Ananya', email: 'ananya@company.com' }}
+  buildId={process.env.BUILD_ID}
+  gitSha={process.env.GIT_SHA}
+  env={process.env.NODE_ENV}
+>
+  {children}
+</FeedbackProvider>
+```
+
+> `buildId`, `gitSha`, and `env` props ship in **v0.4**. Today, pass them inside `user` or via your own metadata layer; the example is shown so docs and code line up when v0.4 lands.
+
+### Routing config
+
+Declarative routing lets a PM say "checkout bugs go to Slack #checkout + JIRA CHK; growth flag goes to Linear; praise goes to #kudos" without an engineer touching code per change.
+
+```ts
+// snapfeed.config.ts
+import { defineRouting } from 'snapfeed/routing'
+
+export default defineRouting({
+  routes: [
+    { match: '/checkout/**', to: { team: 'payments', slack: '#checkout-feedback', jira: 'CHK' } },
+    { flag: 'new_onboarding', to: { team: 'growth', linear: 'GRW' } },
+    { category: 'praise', to: { slack: '#kudos' } },
+  ],
+  default: { team: 'platform', slack: '#bugs' },
+})
+```
+
+> Tier 2 — reading the same routing table from a Google Sheet / Excel / CSV so a PM can edit without a deploy — ships in **v0.4**.
+
+### LLM (BYOK, optional)
+
+Every smart feature degrades cleanly without an LLM key. The library works fully without one.
+
+| Feature | With LLM | Without LLM |
+|---------|----------|-------------|
+| Title write | Auto-generated from voice/text | First 80 chars of text |
+| Severity | Inferred | Reporter picks or default |
+| Dedup | Embedding similarity | Exact-match in last 7d |
+| Repro steps | Extracted from voice + journey | Raw journey trail shown |
+
+```ts
+// Planned shape — ships in v0.4
+import { defineLLM } from 'snapfeed/llm'
+
+export default defineLLM({
+  provider: 'anthropic', // 'anthropic' | 'openai' | 'azure-openai' | 'bedrock' | 'ollama' | 'custom'
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+})
+```
+
+> LLM features and voice capture ship in **v0.4**. Not in this release.
+
+## Adapters
+
+```ts
+import { slackAdapter } from 'snapfeed/adapters'
+```
+
+Built-in adapters (alphabetical):
+
+| Adapter | Status | Use it for |
+|---------|--------|------------|
+| `consoleAdapter` | ✅ shipped | Local dev, debugging |
+| `discordAdapter` | ✅ v0.3 | Indie / community / OSS teams |
+| `fileAdapter` | ✅ v0.3 | Local dev, audit log, Node-only |
+| `githubAdapter` | ✅ shipped | Bug tracking when you live in GitHub |
+| `googleSheetsAdapter` | ✅ v0.3 | Lightweight tracking, non-tech editing |
+| `jiraAdapter` | ✅ v0.3 | Mid-size / corporate workflows |
+| `linearAdapter` | ✅ v0.3 | Startup / product teams |
+| `slackAdapter` | ✅ shipped | Real-time team awareness |
+| `supabaseAdapter` | ✅ shipped | Postgres-backed inbox |
+| `telegramAdapter` | ✅ shipped | Solo / lightweight notifications |
+| `webhookAdapter` | ✅ shipped | Anything else (your own backend) |
+| `autoAdapters` | ✅ v0.3 | Reads `SNAPFEED_*` env vars and wires automatically |
+
+### Writing a custom adapter
+
+Adapters implement the `FeedbackAdapter` interface from `src/types.ts`:
 
 ```ts
 import type { FeedbackAdapter } from 'snapfeed'
 
-const myAdapter: FeedbackAdapter = {
+export const myAdapter: FeedbackAdapter = {
   name: 'my-adapter',
   async send(payload) {
-    // do something with payload
-    console.log(payload.text)
+    await fetch('https://internal.example.com/bugs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
     return { ok: true, deliveryId: 'optional-id' }
   },
 }
 ```
 
----
-
-## Server Helpers
-
-Server-side handlers run your adapters safely on the backend (no secrets exposed to the browser). Set `apiUrl` in `FeedbackProvider` and add a route.
-
-### Next.js App Router
-
-```ts
-// app/api/feedback/route.ts
-import { createFeedbackHandler } from 'snapfeed/server/nextjs'
-import { supabaseAdapter, telegramAdapter } from 'snapfeed/adapters'
-
-export const POST = createFeedbackHandler({
-  adapters: [
-    supabaseAdapter({
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    }),
-    telegramAdapter({
-      botToken: process.env.TELEGRAM_BOT_TOKEN!,
-      chatId: process.env.TELEGRAM_CHAT_ID!,
-    }),
-  ],
-  // Optional hooks
-  onReceive(payload) {
-    // Return false to reject
-    return payload.text.length <= 2000
-  },
-  onComplete(payload, results) {
-    console.log('Feedback received:', payload.appName, results)
-  },
-})
-```
-
-In your layout:
-```tsx
-<FeedbackProvider appName="MyApp" apiUrl="/api/feedback">
-  {children}
-</FeedbackProvider>
-```
-
-### Express
-
-```ts
-import express from 'express'
-import { feedbackMiddleware } from 'snapfeed/server/express'
-import { supabaseAdapter, telegramAdapter } from 'snapfeed/adapters'
-
-const app = express()
-app.use(express.json({ limit: '10mb' })) // allow images
-
-app.post('/api/feedback', feedbackMiddleware({
-  adapters: [
-    supabaseAdapter({ url: '...', serviceKey: '...' }),
-    telegramAdapter({ botToken: '...', chatId: '...' }),
-  ],
-}))
-```
-
----
-
-## FeedbackPayload Type
-
-This is what gets sent to every adapter:
-
-```ts
-interface FeedbackPayload {
-  text: string         // feedback text
-  appName: string      // from FeedbackProvider.appName
-  pageUrl: string      // full URL (window.location.href)
-  pageName: string     // document.title at time of submission
-  timestamp: string    // ISO 8601
-
-  user?: {
-    name?: string
-    email?: string
-  }
-
-  metadata?: {
-    viewport: string       // e.g. "1440x900"
-    userAgent: string
-    consoleErrors: string[] // last 20 console.error() calls
-  }
-
-  screenshot?: {
-    base64: string      // raw base64, no data URI prefix
-    mimeType: string    // e.g. "image/png"
-  }
-}
-```
-
----
-
----
-
-## Annotation Layer
-
-After attaching a screenshot (paste, upload, or auto-capture), a **✏️ Annotate** button appears on the image preview. Clicking it opens a full-screen annotation canvas.
-
-### Tools
-
-| Tool | Description |
-|------|-------------|
-| ✏️ Pen | Free-draw strokes |
-| ⬜ Rectangle | Outline boxes to highlight areas |
-| ↗ Arrow | Draw arrows pointing at issues |
-| 🖊 Highlighter | Semi-transparent yellow overlay |
-
-### Colors
-
-Red (default), yellow, blue, white, black — click any dot to switch.
-
-### Controls
-
-- **↩ Undo** — remove the last stroke
-- **✓ Done** — merge the annotations onto the screenshot; the annotated PNG replaces the original
-- **Cancel** — discard annotations and return to the form
-
-### UX flow
-
-1. User attaches screenshot (paste, drag-and-drop, or file picker)
-2. `✏️ Annotate` button appears next to the image preview
-3. Click opens the annotation overlay
-4. Draw with the chosen tool and color
-5. Click **Done** → the annotated image replaces the original in the payload
-6. Submit as usual
-
-No external libraries. Pure Canvas API, fully inline styles.
-
----
-
-## Feedback Categories
-
-A single-select category row appears in the feedback form between the header and the textarea.
-
-### Available categories
-
-| Chip | Value | Telegram/Slack/GitHub label |
-|------|-------|----------------------------|
-| 🐛 Bug | `bug` | `bug` label on GitHub |
-| 💡 Idea | `idea` | `enhancement` label on GitHub |
-| ❓ Question | `question` | `question` label on GitHub |
-| 🙌 Praise | `praise` | `feedback` label on GitHub |
-| 📝 Other | `other` | `feedback` label on GitHub |
-
-Click a chip to select it; click again to deselect. The selected chip gets an accent-colored background.
-
-The `category` field is included in every `FeedbackPayload`:
-
-```ts
-interface FeedbackPayload {
-  // ... existing fields ...
-  category?: 'bug' | 'idea' | 'question' | 'praise' | 'other'
-}
-```
-
-All adapters include the category:
-- **Telegram** — shown in the message header: `🔧 MyApp Feedback 🐛 Bug`
-- **Slack** — shown as a separate field in the Block Kit section
-- **Supabase** — stored in the `category` column
-- **GitHub** — used as a label + shown in the issue title and body
-
----
-
-## FeedbackInbox Component
-
-A self-contained admin panel for browsing, filtering, and resolving feedback from Supabase.
-
-```tsx
-import { FeedbackInbox } from 'snapfeed'
-
-// In your admin page:
-<FeedbackInbox
-  supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
-  supabaseKey={process.env.SUPABASE_SERVICE_ROLE_KEY!}
-  appName="MyApp"         // optional: filter to one app
-  accentColor="#D4714B"  // optional
-  theme="auto"           // optional: "auto" | "light" | "dark"
-/>
-```
-
-### FeedbackInbox Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `supabaseUrl` | `string` | required | Your Supabase project URL |
-| `supabaseKey` | `string` | required | Anon key (public) or service role key (server-rendered pages) |
-| `table` | `string` | `"feedback"` | Table name to read from |
-| `appName` | `string` | — | Filter results to one app |
-| `accentColor` | `string` | `"#D4714B"` | Accent color for highlights |
-| `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | Color theme |
-| `className` | `string` | — | CSS class for the root container |
-
-### Features
-
-- **Search** — filter by text content (case-insensitive)
-- **Category filter** — show only bugs, ideas, questions, etc.
-- **Delivery filter** — delivered / undelivered
-- **Status filter** — open / resolved
-- **Date range** — from/to date pickers
-- **Sort** — newest first or oldest first
-- **Pagination** — 25 items per page
-- **Expandable rows** — click any row to see full text, page URL, sender email, viewport, user agent, console errors, and the screenshot
-- **Resolve / Reopen** — toggle the `resolved` boolean column directly from the inbox
-
-### Required table columns
-
-The inbox reads and writes these Supabase columns:
-
-```
-id, created_at, app_name, text, page_name, page_url, sender, sender_email,
-image_base64, image_mime_type, metadata, delivered, delivery_channel, delivery_id,
-category, resolved
-```
-
-See the [SQL schema](#supabase-adapter) for the full `CREATE TABLE` statement.
-
----
-
-## Auto-Screenshot (html2canvas)
-
-To enable automatic screenshot capture on widget open:
-
-1. Install html2canvas:
-   ```bash
-   npm install html2canvas
-   ```
-
-2. Enable in provider:
-   ```tsx
-   <FeedbackProvider autoScreenshot={true} ...>
-   ```
-
-html2canvas is loaded lazily — it only runs when `autoScreenshot` is true and the widget opens. It won't bloat your main bundle.
-
----
-
-## TypeScript
-
-Full TypeScript support with strict mode. All types are exported:
-
-```ts
-import type {
-  FeedbackPayload,
-  FeedbackAdapter,
-  FeedbackAdapterResult,
-  FeedbackProviderConfig,
-  FeedbackContextValue,
-  FeedbackHandlerConfig,
-} from 'snapfeed'
-```
-
----
-
-## Production Mode
-
-By default, `FeedbackProvider` is a no-op in production (it just renders children). This is a safety rail — you don't want end-users of a live product to accidentally see a dev feedback widget.
-
-To enable in production:
-```tsx
-<FeedbackProvider enableInProduction={true} ...>
-```
-
-The widget is **always active** on `localhost` regardless of this setting.
-
----
-
-## Recipes
-
-### Full stack pattern (Supabase + Telegram via server route)
-
-```tsx
-// layout.tsx
-<FeedbackProvider
-  appName="MyApp"
-  accentColor="#D4714B"
-  apiUrl="/api/feedback"
-  user={{ name: 'Jane' }}
->
-  {children}
-</FeedbackProvider>
-
-// app/api/feedback/route.ts
-export const POST = createFeedbackHandler({
-  adapters: [
-    supabaseAdapter({ url: process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
-    telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN!, chatId: process.env.TELEGRAM_CHAT_ID! }),
-  ],
-})
-```
-
-### Multiple apps, one adapter config
-
-```ts
-// shared/feedback.ts
-export const feedbackAdapters = [
-  supabaseAdapter({ url: process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
-  telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN!, chatId: process.env.TELEGRAM_CHAT_ID! }),
-]
-
-// each app's layout.tsx
-<FeedbackProvider appName="AppName" adapters={feedbackAdapters}>
-```
-
-### Dark mode app
-
-```tsx
-<FeedbackProvider theme="dark" accentColor="#3B82F6" ...>
-```
-
-### Inline button in sidebar nav
-
-```tsx
-import { FeedbackButton } from 'snapfeed'
-
-function Sidebar() {
-  return (
-    <nav>
-      <FeedbackButton inline label="Send feedback" />
-    </nav>
-  )
-}
-```
-
----
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for adapter guidelines and the test harness.
+
+## Auto-adapter env vars
+
+| Env var | Adapter |
+|---------|---------|
+| `SNAPFEED_SLACK_WEBHOOK` | Slack |
+| `SNAPFEED_DISCORD_WEBHOOK` | Discord |
+| `SNAPFEED_GITHUB_TOKEN` + `SNAPFEED_GITHUB_REPO` | GitHub Issues (`owner/repo`) |
+| `SNAPFEED_TELEGRAM_BOT_TOKEN` + `SNAPFEED_TELEGRAM_CHAT_ID` | Telegram |
+| `SNAPFEED_WEBHOOK_URL` | Generic webhook |
+| `SNAPFEED_FILE_PATH` | JSONL file |
+
+If none are set in dev, falls back to `[fileAdapter, consoleAdapter]`. In production, returns `[]` and warns once.
 
 ## Security
 
-snapfeed is built for developer and internal use. Here's what's protected by default and what you control.
+Threat model: "don't let our own widget become the leak." Defaults reflect that.
 
-### Built-in protections
+- Zero phone-home — no telemetry, no analytics, no relay
+- Self-hostable, MIT, no CLA
+- Secrets stay server-side (use `apiUrl` + `createFeedbackHandler`, not client-side adapters with tokens)
+- LLM optional, BYOK only — never proxied through us
+- Console-error sanitization strips tokens / keys / JWTs before transit
+- Origin allowlist, payload caps, rate limit on the server handler
+- See [SECURITY.md](./SECURITY.md) for the corporate review checklist
 
-| Protection | Default | Configurable |
-|---|---|---|
-| **Production off by default** | Widget hidden in prod unless `enableInProduction: true` | Yes |
-| **Rate limiting** | Not active unless you set `rateLimit` | Yes — per-IP sliding window |
-| **Payload size cap** | 10KB text/metadata, 5MB screenshot | Yes — `maxPayloadBytes`, `maxScreenshotBytes` |
-| **Console error sanitization** | Auto-strips tokens, keys, secrets, JWTs from captured errors | Always on |
-| **Origin allowlist** | Open (no restriction) | Yes — `allowedOrigins` |
+## Production safety
 
-### Rate limiting
-
-Enabled by adding `rateLimit` to `createFeedbackHandler` or `feedbackMiddleware`. Uses an in-memory sliding window per IP by default — works for single-instance servers. For multi-instance deployments (multiple Vercel regions, clustered Node), provide a Redis/Upstash-backed store.
-
-```ts
-// Basic — 10 submissions per minute per IP
-export const POST = createFeedbackHandler({
-  adapters: [...],
-  rateLimit: { max: 10, windowMs: 60_000 },
-})
-
-// Custom store (Redis / Upstash)
-import type { RateLimitStore } from 'snapfeed'
-
-const redisStore: RateLimitStore = {
-  async increment(key, windowMs) {
-    // Your Redis INCR + EXPIRE logic here
-    // Must return: { count: number, resetAt: number (ms epoch) }
-  },
-}
-
-export const POST = createFeedbackHandler({
-  adapters: [...],
-  rateLimit: { max: 10, windowMs: 60_000, store: redisStore },
-})
-```
-
-### Origin allowlist
-
-Restrict submissions to specific domains. Accepts exact strings or RegExp.
-
-```ts
-export const POST = createFeedbackHandler({
-  adapters: [...],
-  allowedOrigins: [
-    'https://myapp.com',
-    'https://staging.myapp.com',
-    /\.myapp\.com$/,   // all subdomains
-  ],
-})
-```
-
-### Screenshot size cap
-
-```ts
-export const POST = createFeedbackHandler({
-  adapters: [...],
-  maxScreenshotBytes: 2 * 1024 * 1024, // 2MB cap
-})
-```
-
-### Keeping secrets server-side
-
-**Never** pass `supabaseAdapter` with a service role key or `telegramAdapter` with a bot token directly inside `FeedbackProvider` (client-side). Both would be visible in the browser bundle.
-
-✅ **Correct — secrets stay on the server:**
-```tsx
-// Client: no secrets
-<FeedbackProvider appName="MyApp" apiUrl="/api/feedback">
-
-// Server: secrets here only
-export const POST = createFeedbackHandler({
-  adapters: [
-    supabaseAdapter({ serviceKey: process.env.SUPABASE_SERVICE_KEY! }),
-    telegramAdapter({ botToken: process.env.TELEGRAM_BOT_TOKEN! }),
-  ],
-})
-```
-
-❌ **Wrong — bot token exposed to browser:**
-```tsx
-<FeedbackProvider
-  adapters={[telegramAdapter({ botToken: 'bot123:...' })]} // ← visible in bundle
->
-```
-
-### Production use with real users
-
-If you enable `enableInProduction: true` for beta users or internal testers, scope it by user role to prevent it appearing for all end users:
+`enableInProduction` is `false` by default — the widget is a no-op in `NODE_ENV === 'production'` unless you opt in. When you enable it for a beta cohort, gate by role so end customers never see it (this is what Kenji from the journey above relies on):
 
 ```tsx
 <FeedbackProvider
@@ -1011,16 +264,31 @@ If you enable `enableInProduction: true` for beta users or internal testers, sco
   user={{ name: user.name, email: user.email }}
   apiUrl="/api/feedback"
 >
+  {children}
+</FeedbackProvider>
 ```
 
----
+## Roadmap
 
-## Browser Support
+| Phase | Cut as | Highlights |
+|-------|--------|------------|
+| v0.3 (this release) | now | Hygiene, file/auto/jira/linear/sheets/discord adapters, routing config, CLI, runnable Next.js example |
+| v0.4 | next | Voice capture, LLM (BYOK, all providers), spreadsheet-backed routing source, MS Teams adapter, audit log |
+| v0.5 |  | Docker compose stack, admin UI (embed + standalone), SSO/SAML, full air-gapped install guide |
+| v1.0 |  | React Native SDK, screen recording rewind, network log capture, Release Campaigns, Vue/Svelte clients |
 
-All modern browsers. No IE support. Uses `fetch`, `FileReader`, `ClipboardEvent`, `KeyboardEvent`.
+## Examples
 
----
+- **Next.js**: `examples/nextjs/` — runnable with `npm install && npm run dev`. Uses `autoAdapters()` + env vars.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). We welcome adapters, accessibility fixes, framework ports, and translations.
+
+## Code of conduct
+
+See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 ## License
 
-MIT
+MIT. See [LICENSE](./LICENSE).

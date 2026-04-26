@@ -1,0 +1,89 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+title: "[Bug] "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more detail you can provide, the faster we can fix it.
+
+        **For security issues, please do not file a public issue.** Email shimoverse@gmail.com — see [SECURITY.md](https://github.com/shimoverse/snapfeed/blob/main/SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: snapfeed version
+      description: Output of `npm list snapfeed` or the commit SHA you are on.
+      placeholder: "0.3.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Deployment mode
+      description: Which mode are you running snapfeed in?
+      options:
+        - Cloud-relayed (indie / hackathon / startup)
+        - Self-hosted (your own backend)
+        - Air-gapped (corporate / regulated)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: adapters
+    attributes:
+      label: Adapters in use
+      description: Which adapters were configured when the bug occurred?
+      placeholder: "slackAdapter, jiraAdapter"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Open the widget with Ctrl+Shift+F
+        2. Type "..." in the textarea
+        3. Click Send
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: console_errors
+    attributes:
+      label: Console / network errors
+      description: Any errors visible in the browser console or network tab. Redact tokens before pasting.
+      render: shell
+
+  - type: input
+    id: browser_os
+    attributes:
+      label: Browser and OS
+      placeholder: "Chrome 124 on macOS 14.4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help — screenshots, related issues, recent changes.

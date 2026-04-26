@@ -47,4 +47,26 @@ export default defineConfig([
     treeshake: true,
     outDir: 'dist',
   },
+  // Routing module (pure config helpers, no React)
+  {
+    entry: { routing: 'src/routing.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // CLI (Node-only). Source already begins with `#!/usr/bin/env node`,
+  // so we don't add a banner — that would double-shebang the output.
+  {
+    entry: { cli: 'src/cli.ts' },
+    format: ['cjs'],
+    dts: false,
+    sourcemap: false,
+    target: 'node18',
+    platform: 'node',
+    treeshake: true,
+    outDir: 'dist',
+  },
 ])

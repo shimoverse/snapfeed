@@ -1,0 +1,57 @@
+name: Adapter request
+description: Request a new destination adapter (JIRA, Linear, ServiceNow, etc.).
+title: "[Adapter] "
+labels: [adapter, enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        New adapters are welcome. Please share enough detail that someone can build it without back-and-forth.
+
+  - type: input
+    id: service_name
+    attributes:
+      label: Service name
+      placeholder: "Microsoft Teams"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth_method
+    attributes:
+      label: Authentication method
+      options:
+        - API key
+        - OAuth (user)
+        - OAuth (app / service)
+        - Webhook URL
+        - Service account
+        - Basic auth
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: api_docs_url
+    attributes:
+      label: API docs URL
+      placeholder: "https://learn.microsoft.com/en-us/graph/..."
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Why your team needs this destination
+      description: A short story helps prioritize.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: willing_to_contribute
+    attributes:
+      label: Are you willing to contribute the adapter?
+      options:
+        - Yes — I will send a PR
+        - Maybe — with some guidance
+        - No — just requesting
+    validations:
+      required: true

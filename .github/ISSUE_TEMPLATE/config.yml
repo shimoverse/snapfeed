@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / Discussion
+    url: https://github.com/shimoverse/snapfeed/discussions
+    about: For general questions, design discussions, or "how do I do X" please use Discussions instead of issues.
+  - name: Security disclosure
+    url: https://github.com/shimoverse/snapfeed/blob/main/SECURITY.md
+    about: For security vulnerabilities, please email shimoverse@gmail.com — do not open a public issue.

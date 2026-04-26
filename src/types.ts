@@ -59,6 +59,12 @@ export interface FeedbackAdapterResult {
   error?: string
   /** Adapter-specific delivery ID (e.g. Telegram message_id, Supabase row id) */
   deliveryId?: string
+  /**
+   * Non-fatal issues encountered while delivering. Adapter still counts as
+   * `ok: true` (the primary message went through), but the caller can surface
+   * these to the user — for example "delivered, screenshot upload failed".
+   */
+  warnings?: string[]
 }
 
 // ─── Provider Config ──────────────────────────────────────────────────────────

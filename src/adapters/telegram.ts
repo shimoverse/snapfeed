@@ -100,18 +100,18 @@ export function telegramAdapter(options: TelegramAdapterOptions): FeedbackAdapte
         }
         const messageId = String(textData.result?.message_id ?? '')
 
+        const warnings: string[] = []
+
         // Optionally send screenshot as a follow-up photo
         if (sendScreenshot && payload.screenshot?.base64) {
           const mimeType = payload.screenshot.mimeType || 'image/png'
-          // Build a data URI for FormData
-          // Convert base64 to Blob for FormData
           const byteChars = atob(payload.screenshot.base64)
           const byteNums = new Array(byteChars.length)
           for (let i = 0; i < byteChars.length; i++) {
             byteNums[i] = byteChars.charCodeAt(i)
           }
           const byteArray = new Uint8Array(byteNums)
-          const blob = new Blob([byteArray], { type: mimeType })
+          const blob = new Blob([byteArray as BlobPart], { type: mimeType })
 
           const form = new FormData()
           form.append('chat_id', chatId)
@@ -124,12 +124,20 @@ export function telegramAdapter(options: TelegramAdapterOptions): FeedbackAdapte
           })
 
           if (!photoRes.ok) {
-            // Screenshot failed but text was sent — still count as ok
-            console.warn('[telegram adapter] screenshot upload failed')
+            // Screenshot failed but text was sent — surface as a warning
+            // so the caller can show "delivered, screenshot upload failed"
+            // instead of silently dropping it.
+            const detail = await photoRes.text().catch(() => '')
+            warnings.push(
+              `screenshot upload failed (HTTP ${photoRes.status}): ${detail.slice(0, 200)}`
+            )
+            console.warn(`[telegram adapter] ${warnings[warnings.length - 1]}`)
           }
         }
 
-        return { ok: true, deliveryId: messageId }
+        return warnings.length > 0
+          ? { ok: true, deliveryId: messageId, warnings }
+          : { ok: true, deliveryId: messageId }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         return { ok: false, error: `Telegram adapter error: ${message}` }
