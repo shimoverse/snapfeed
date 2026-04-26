@@ -15,7 +15,7 @@ body:
     attributes:
       label: snapfeed version
       description: Output of `npm list snapfeed` or the commit SHA you are on.
-      placeholder: "0.3.0"
+      placeholder: "0.5.3"
     validations:
       required: true
 

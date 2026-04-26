@@ -305,7 +305,7 @@ The default `<FeedbackProvider>` accepts a few quick branding props that don't r
 ```tsx
 <FeedbackProvider
   appName="Acme"             // shown in the header + adapter notifications
-  accentColor="#D4714B"      // primary CTA + focus rings
+  accentColor="#B85A36"      // primary CTA + focus rings (default; WCAG AA on white)
   hotkey="meta+shift+f"      // ⌘⇧F to open
   position="bottom-right"    // bottom-right | bottom-left | top-right | top-left
 />

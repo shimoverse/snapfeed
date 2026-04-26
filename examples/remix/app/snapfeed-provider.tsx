@@ -46,7 +46,7 @@ export function SnapfeedProviderClient({ children }: { children: ReactNode }) {
       hotkey="ctrl+shift+f"
       position="bottom-right"
       theme="auto"
-      accentColor="#D4714B"
+      accentColor="#B85A36"
       autoScreenshot
       enableInProduction={false}
       apiUrl="/api/feedback"

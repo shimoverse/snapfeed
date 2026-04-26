@@ -120,7 +120,7 @@ export const POST = createFeedbackHandler({
 ```
 
 ### 🔒 Air-gapped
-For corporates and regulated industries where every new outbound domain needs a security review. v0.4 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. Image-digest pinning + signed tarball + SSO/SAML for the admin app ship in **v0.5**.
+For corporates and regulated industries where every new outbound domain needs a security review. v0.5 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. Image-digest pinning + signed tarball + SSO/SAML for the admin app are slated for **v0.6** (see [SECURITY.md](./SECURITY.md) §Coming in later releases).
 
 ## Persona picker
 
@@ -150,7 +150,7 @@ import { FeedbackProvider } from 'snapfeed'
 | `hotkey` | `string` | `"ctrl+shift+f"` | Format: `"ctrl+shift+f"`, `"meta+k"`, `"ctrl+alt+b"` |
 | `position` | `"bottom-right" \| "bottom-left" \| "top-right" \| "top-left"` | `"bottom-right"` | Floating trigger position |
 | `theme` | `"auto" \| "light" \| "dark"` | `"auto"` | Color theme; `auto` follows system |
-| `accentColor` | `string` | `"#D4714B"` | Accent color for buttons and focus rings |
+| `accentColor` | `string` | `"#B85A36"` | Accent color for buttons and focus rings (WCAG AA on white) |
 | `adapters` | `FeedbackAdapter[]` | `[]` | Client-side adapters. Skipped when `apiUrl` is in use |
 | `apiUrl` | `string` | `"/api/feedback"` | Server route the widget POSTs to (recommended for prod) |
 | `collectMetadata` | `boolean` | `true` | Auto-collect viewport, UA, console errors |
@@ -241,13 +241,20 @@ Every smart feature degrades cleanly without an LLM key. The library works fully
 | Repro steps | Extracted from voice + journey | Raw journey trail shown |
 
 ```ts
-// Planned shape — ships in v0.4
-import { defineLLM } from 'snapfeed/llm'
+// Real shape (shipped v0.4, current as of v0.5.3)
+import { createProvider, applyLLM } from 'snapfeed/llm'
 
-export default defineLLM({
-  provider: 'anthropic', // 'anthropic' | 'openai' | 'azure-openai' | 'bedrock' | 'ollama' | 'custom'
+const provider = createProvider({
+  enabled: true,
+  provider: 'anthropic', // 'anthropic' | 'openai' | 'ollama'  (azure via 'openai' baseURL; bedrock + 'custom' on the v0.6 roadmap)
   apiKey: process.env.ANTHROPIC_API_KEY!,
+  features: { title: true, severity: true, repro: true },
+  redactBeforeLLM: true,
 })
+
+// Then in your handler:
+//   const enriched = await applyLLM(payload, provider, { budget })
+//   payload.metadata = { ...payload.metadata, llm: enriched }
 ```
 
 > ✅ Shipped in **v0.4** — `snapfeed/llm` exposes `applyLLM`, `createProvider`, `createBudgetTracker`, and `redactForLLM` with providers for Anthropic, OpenAI (which also covers Azure OpenAI via `endpoint` + `headers`), and Ollama. Voice capture ships at `snapfeed/voice`; screen recording at `snapfeed/screen-recording`.

@@ -18,7 +18,7 @@ A minimal runnable Next.js 14 app that uses the local `snapfeed` package
 
 - `app/layout.tsx` — server component that mounts the client provider
 - `app/snapfeed-client.tsx` — `<FeedbackProvider>` (client) with
-  `appName="Demo App"`, hotkey `ctrl+shift+f`, accent `#D4714B`
+  `appName="Demo App"`, hotkey `ctrl+shift+f`, accent `#B85A36`
 - `app/api/feedback/route.ts` — `createFeedbackHandler({ adapters: autoAdapters() })`
   reads `SNAPFEED_*` env vars and falls back to console if none are set
 - `app/page.tsx` — landing page with a programmatic-trigger button and a

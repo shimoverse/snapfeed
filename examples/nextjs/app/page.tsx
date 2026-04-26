@@ -5,7 +5,14 @@ import { ClientPanel } from './client-panel'
  * Server component — reads SNAPFEED_* env vars and passes detection
  * results to the client. The <FeedbackProvider> is mounted in layout.tsx,
  * so this page just renders the marketing surface.
+ *
+ * Force dynamic rendering: this page reads `process.env` at request time
+ * AND mounts a client island (`<ClientPanel />`) that uses `useDevFeedback`,
+ * which depends on the FeedbackProvider context. Skipping the static
+ * prerender pass keeps both concerns simple.
  */
+export const dynamic = 'force-dynamic'
+
 const ENV_KEYS = [
   'SNAPFEED_SLACK_WEBHOOK',
   'SNAPFEED_DISCORD_WEBHOOK',

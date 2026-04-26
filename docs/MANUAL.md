@@ -1,8 +1,8 @@
 # snapfeed reference manual
 
-> The canonical reference for snapfeed v0.4. Beyond the [quickstart guides](./quickstart/index.md), this document is "how to do anything in snapfeed." Long form, structured so you can jump to a section.
+> The canonical reference for snapfeed v0.5. Beyond the [quickstart guides](./quickstart/index.md), this document is "how to do anything in snapfeed." Long form, structured so you can jump to a section.
 
-Last updated: 2026-04-26 (snapfeed v0.4.0)
+Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ---
 
@@ -97,7 +97,8 @@ Per-feature toggles:
 | `features.title` | Generated 6–12 word title | First 80 chars of `text` |
 | `features.severity` | Inferred `p0`/`p1`/`p2`/`nit` | Reporter-picked `category` or default |
 | `features.repro` | Extracted numbered steps | Raw text + journey trail |
-| `features.redact` | Second-pass LLM redaction (defense in depth) | Regex `redactForLLM` only |
+
+> An LLM-driven `features.redact` second-pass was advertised in early v0.4 drafts but never landed. Use `redactBeforeLLM: true` (regex + entropy sweep) for outbound payload redaction. A second-pass redact feature is on the v0.6 roadmap.
 
 Budget gating: if `budget.allow(EST_TOKENS)` returns false, the feature degrades; the run returns `degraded: true` with a `warnings[]` entry like `"title: skipped (budget exhausted)"`.
 
@@ -225,7 +226,7 @@ function HotkeyExtra() {
 <FeedbackProvider theme="dark" accentColor="#7c3aed">{children}</FeedbackProvider>
 ```
 
-`theme`: `"auto"` (default; follows `prefers-color-scheme`), `"light"`, `"dark"`. `accentColor`: any CSS color string. The default `#D4714B` meets WCAG AA on white and dark; consumer-supplied colors are not contrast-checked.
+`theme`: `"auto"` (default; follows `prefers-color-scheme`), `"light"`, `"dark"`. `accentColor`: any CSS color string. The default `#B85A36` is ~4.7:1 against white and meets WCAG AA on the default light theme; consumer-supplied colors are not contrast-checked.
 
 ### 3.5 Identifying the reporter (sync auth)
 
@@ -627,9 +628,10 @@ features: {
   title: true,
   severity: true,
   repro: false,   // off — falls back to raw text
-  redact: false,  // off — regex sweep only
 }
 ```
+
+> `features.redact` (LLM second-pass redaction) is **not shipped** — the toggle in early v0.4 drafts was a no-op and has been removed from the public type. For outbound redaction, use `redactBeforeLLM: true` (regex + entropy sweep, see §6.7). A real LLM redaction feature is planned for v0.6.
 
 Each feature degrades independently. If `title` errors but `severity` succeeds, the result has `title: undefined` + `severity: 'p1'` + `degraded: true` + `warnings: ['title: ...']`.
 
@@ -1269,4 +1271,4 @@ All of the adapters above plus their per-adapter option types (e.g. `SlackAdapte
 
 ---
 
-> Document version: v0.4.0 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed.
+> Document version: v0.5.3 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed.

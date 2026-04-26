@@ -1,8 +1,8 @@
 # snapfeed adoption playbook
 
-> **Adoption playbook for snapfeed v0.4. Use this as a template — copy what fits, drop what doesn't.** Written for an engineering manager who has decided to try snapfeed and needs to (a) convince their team it's worth the airtime, (b) roll it out without breaking anything, and (c) know within 30 days whether it's working.
+> **Adoption playbook for snapfeed v0.5. Use this as a template — copy what fits, drop what doesn't.** Written for an engineering manager who has decided to try snapfeed and needs to (a) convince their team it's worth the airtime, (b) roll it out without breaking anything, and (c) know within 30 days whether it's working.
 
-Last updated: 2026-04-26 (snapfeed v0.4.0)
+Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ---
 
@@ -311,4 +311,4 @@ snapfeed is uninstallable. Remove the `<FeedbackProvider>` from your app, remove
 
 ---
 
-> Document version: v0.4.0 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed in this release.
+> Document version: v0.5.3 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed in this release.

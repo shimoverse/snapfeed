@@ -55,7 +55,7 @@ anywhere.
 ## What's wired up
 
 - `src/main.tsx` — mounts `<FeedbackProvider>` with `appName="Vite Demo"`,
-  hotkey `ctrl+shift+f`, accent `#D4714B`, `autoScreenshot`.
+  hotkey `ctrl+shift+f`, accent `#B85A36`, `autoScreenshot`.
 - `src/App.tsx` — landing page with a programmatic-trigger button using
   the `useDevFeedback` hook.
 - `vite.config.ts` — proxies `/api/feedback` → `http://localhost:8788`.

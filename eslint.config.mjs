@@ -34,6 +34,12 @@ export default [
       'node_modules/**',
       'examples/*/node_modules/**',
       'examples/*/.next/**',
+      // Bundler outputs from the example apps. These are minified/transformed
+      // and not source — linting them produces tens of thousands of false
+      // positives (no-undef on bundled globals, etc.).
+      'examples/*/build/**',
+      'examples/*/dist/**',
+      'examples/*/public/build/**',
       'coverage/**',
       '**/*.tsbuildinfo',
     ],

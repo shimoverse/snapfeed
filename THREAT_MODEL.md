@@ -1,8 +1,8 @@
 # Threat Model
 
-> **Practical threat model for snapfeed v0.4.0.** Written for security engineers evaluating the library before adoption. Concrete, specific, and grounded in the actual source — every mitigation references the file and function that implements it.
+> **Practical threat model for snapfeed v0.5.3.** Written for security engineers evaluating the library before adoption. Concrete, specific, and grounded in the actual source — every mitigation references the file and function that implements it.
 
-Last updated: 2026-04-26 (snapfeed v0.4.0). This document describes the threats the library is designed to defend against, the threats that are explicitly out of scope, and the residual risks that the consumer must mitigate at the deployment layer.
+Last updated: 2026-04-26 (snapfeed v0.5.3). This document describes the threats the library is designed to defend against, the threats that are explicitly out of scope, and the residual risks that the consumer must mitigate at the deployment layer.
 
 ---
 

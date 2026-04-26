@@ -151,7 +151,7 @@ export function AnnotationCanvas({
   imageDataUrl,
   onDone,
   onCancel,
-  accentColor = '#D4714B',
+  accentColor = '#B85A36',
   theme = 'light',
 }: AnnotationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)

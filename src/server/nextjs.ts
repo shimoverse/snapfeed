@@ -34,23 +34,21 @@ import {
   normalizePayload,
 } from './security'
 
-// We use a minimal type instead of importing from 'next/server' to avoid a hard dependency.
-type NextRequest = {
-  json(): Promise<unknown>
-  headers: { get(name: string): string | null }
-  ip?: string
-}
-
-type NextResponse = {
-  json(body: unknown, init?: { status?: number; headers?: Record<string, string> }): NextResponse
-}
-
+// We deliberately type the handler input as the standard web `Request` and
+// the output as the standard web `Response`. Next 14's App Router route
+// validator accepts `Request | NextRequest` for the input and
+// `Response | Promise<Response>` for the return — so widening to the standard
+// types keeps consumers' `next build` green without forcing a hard dependency
+// on `next/server`. At runtime, Next's `NextResponse` extends `Response`, so
+// the actual returned object satisfies both shapes.
+//
+// Vercel still injects `req.ip` at runtime; we read it via a small cast.
 type NextServerModule = {
   NextResponse: {
     json(
       body: unknown,
       init?: { status?: number; headers?: Record<string, string> }
-    ): NextResponse
+    ): Response
   }
 }
 
@@ -87,7 +85,7 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
   // disabled. Emitted at handler-construction time, not per-request.
   warnIfOriginsOpenInProd(config)
 
-  return async function POST(req: NextRequest): Promise<NextResponse> {
+  return async function POST(req: Request): Promise<Response> {
     const { NextResponse: NR } = await loadNextServer()
 
     // Audit log helper. Failures are caught and logged via `console.error` —
@@ -102,11 +100,13 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
     }
 
     // Pull client IP — prefer the LAST hop in `x-forwarded-for` (the trusted
-    // proxy), not the first (attacker-controlled). When `req.ip` is set by
-    // the platform (Vercel, etc.) it's the most trustworthy source.
+    // proxy), not the first (attacker-controlled). On Vercel and similar
+    // platforms, `NextRequest` adds an `ip` field; we read it via a structural
+    // cast so we don't depend on the `next/server` types at compile time.
     const xff = req.headers.get('x-forwarded-for')
     const lastHop = xff ? xff.split(',').pop()?.trim() : undefined
-    const ip = req.ip ?? lastHop ?? req.headers.get('x-real-ip') ?? 'unknown'
+    const platformIp = (req as unknown as { ip?: string }).ip
+    const ip = platformIp ?? lastHop ?? req.headers.get('x-real-ip') ?? 'unknown'
 
     // ── Origin check ──────────────────────────────────────────────────────────
     const origin = req.headers.get('origin')

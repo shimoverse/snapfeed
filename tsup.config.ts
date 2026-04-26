@@ -173,4 +173,17 @@ export default defineConfig([
     splitting: false,
     outDir: 'dist',
   },
+  // i18n messages — defaultMessages + mergeMessages helpers and the
+  // FeedbackMessages type. Pure data, zero React dependency. Exposed as
+  // its own subpath so consumers can import only the strings they need
+  // without pulling in the widget bundle.
+  {
+    entry: { messages: 'src/messages.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
 ])

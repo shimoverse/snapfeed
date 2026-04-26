@@ -46,7 +46,7 @@ Before touching your internal Git mirror, hand your security team this set of fi
 git clone https://github.com/shimoverse/snapfeed.git snapfeed-mirror
 cd snapfeed-mirror
 git fetch --tags
-git checkout v0.4.0
+git checkout v0.5.3
 git tag review-approved-2026-q2
 git push --tags origin
 ```
@@ -58,7 +58,7 @@ From now on, your CI builds from `review-approved-2026-q2`, not from `main`. Re-
 ```bash
 docker build \
   --no-cache \
-  -t internal-registry.acmecorp.local/snapfeed:0.4.0 \
+  -t internal-registry.acmecorp.local/snapfeed:0.5.3 \
   -f docker/Dockerfile \
   .
 ```
@@ -68,7 +68,7 @@ For full reproducibility, also pin the base image by digest. Edit `docker/Docker
 ## 4. Push to your internal registry
 
 ```bash
-docker push internal-registry.acmecorp.local/snapfeed:0.4.0
+docker push internal-registry.acmecorp.local/snapfeed:0.5.3
 ```
 
 Mirror the upstream MinIO and (optionally) Ollama images the same way. The exact image references in `docker/docker-compose.yml`:
@@ -131,7 +131,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: internal-registry.acmecorp.local/snapfeed:0.4.0
+          image: internal-registry.acmecorp.local/snapfeed:0.5.3
           ports:
             - containerPort: 8787
           envFrom:

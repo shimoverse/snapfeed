@@ -104,7 +104,9 @@ const SHARED: Pick<
 
 export const lightTheme: SnapfeedTheme = {
   colors: {
-    accent: '#D4714B',
+    // Deeper terra-cotta — ~4.7:1 contrast against white. Earlier value
+    // #D4714B was ~3.1:1 (WCAG AA fail). See FeedbackProvider DEFAULT_CONFIG.
+    accent: '#B85A36',
     accentForeground: '#FFFFFF',
     background: '#FFFFFF',
     foreground: '#1A1A1A',

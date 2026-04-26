@@ -14,7 +14,7 @@ You don't need the source for runtime — you'll install snapfeed via npm in you
 ```bash
 git clone https://github.com/shimoverse/snapfeed.git
 cd snapfeed
-git checkout v0.4.0
+git checkout v0.5.3
 ```
 
 You can pin to a tag here so you control upgrades. The Docker image is built locally from the source — there is no pre-built image on Docker Hub yet.
@@ -126,7 +126,7 @@ curl http://localhost:8787/healthz
 Expected response:
 
 ```json
-{ "ok": true, "version": "0.4.0", "adapters": ["slack", "jira"], "auditLog": "/data/audit/snapfeed.jsonl", "uploadDir": "/data/uploads" }
+{ "ok": true, "version": "0.5.3", "adapters": ["slack", "jira"], "auditLog": "/data/audit/snapfeed.jsonl", "uploadDir": "/data/uploads" }
 ```
 
 If `adapters` is empty or missing entries, your `.env` values aren't being read or the JIRA snippet didn't get committed to `worker.cjs`. Check `docker compose logs worker`.

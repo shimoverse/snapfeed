@@ -975,19 +975,6 @@ export function FeedbackWidget() {
                   </div>
                 )}
 
-                {/*
-                  Reserved row for v0.5.2-rc2 voice + screen recording
-                  buttons. The dedicated wiring agent will fill this slot;
-                  we keep it as an empty placeholder so the visual layout
-                  stays stable across the two PRs. data-attribute makes
-                  the slot easy to target in tests.
-                */}
-                <div
-                  data-snapfeed-media-row
-                  style={{ display: 'none', marginTop: '10px', gap: '8px' }}
-                  aria-hidden="true"
-                />
-
                 {/* Screenshot area */}
                 <div style={{ marginTop: '12px' }}>
                   {capturingAuto ? (

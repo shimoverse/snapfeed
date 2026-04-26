@@ -305,10 +305,11 @@ export function FeedbackProvider({
     const parsed = parseHotkey(mergedConfig.hotkey)
 
     function onKeyDown(e: KeyboardEvent) {
-      // Skip when the user is typing in an editable element AND the hotkey
-      // doesn't include `shift` — a "normal" combo like meta+/ would
-      // otherwise hijack a command-palette or in-input shortcut. The
-      // default ctrl+shift+f includes shift so it always fires.
+      // Skip when the user is typing in an editable element. Earlier this
+      // was conditional on the combo lacking `shift`, but a tester typing
+      // into an autocomplete that closes on blur could lose their input
+      // when ctrl+shift+f hijacked the field — so as of v0.5.2 we always
+      // skip on editable targets regardless of modifiers.
       if (shouldSkipHotkeyForTarget(e.target, parsed)) return
       if (matchesHotkey(e, parsed)) {
         e.preventDefault()

@@ -2,7 +2,7 @@
 
 > **Honest read of where snapfeed sits relative to common regulatory regimes.** snapfeed is a self-hosted MIT library, not a service. The maintainers operate no infrastructure and process no end-user data. As a result, almost every regulatory obligation falls on the **consumer** (the organization that embeds and operates the library). This document maps each regime to what snapfeed provides versus what the consumer must implement.
 
-Last updated: 2026-04-26 (snapfeed v0.4.0)
+Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ---
 
@@ -146,7 +146,7 @@ Current widget targets **WCAG 2.1 AA**. A full audit + remediation is tracked fo
 | Keyboard navigation | Hotkey activation; trigger button is a real `<button>`; tab order through form fields |
 | Focus management | Focus moves to the widget on open; focus trap inside the dialog; focus returns to trigger on close |
 | ARIA labels | Trigger button labeled; dialog has `role="dialog"`; form fields have `<label>` associations |
-| Color contrast | Default `accentColor: "#D4714B"` meets AA on white and dark backgrounds; consumer-overridable colors are not contrast-checked |
+| Color contrast | Default `accentColor: "#B85A36"` (~4.7:1 against white) meets WCAG AA on the default light theme. The previous `#D4714B` failed AA (~3.1:1) and was changed in v0.5.2. Consumer-overridable colors are not contrast-checked. |
 | Screen reader support | Form is semantic HTML; dynamic state changes (recording, sending) need ARIA-live regions — partial coverage |
 | Reduced motion | `prefers-reduced-motion` honored for entrance/exit transitions |
 | Touch target size | All interactive elements ≥44×44 CSS px on mobile |

@@ -1,12 +1,10 @@
-// @vitest-environment jsdom
 /**
  * Tests for src/headless/components.
  *
  * NOTE: All cases here are currently `it.todo` for the same reasons as
- * useFeedbackWidget.test.tsx — see that file's header for the full list:
- *   1. devDep: jsdom
+ * useFeedbackWidget.test.tsx — see that file's header. To activate them:
+ *   1. devDep: jsdom + add the vitest environment pragma at the top
  *   2. devDep: @testing-library/react
- *   3. vitest.config.ts: include `tests/**\/*.test.tsx`
  *
  * The hook-level coverage in useFeedbackWidget.test.tsx exercises the
  * core state machine; these tests cover render contract + slot swap.

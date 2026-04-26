@@ -1,6 +1,6 @@
 {
   "name": "snapfeed",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Internal-dogfooding feedback widget for React/Next.js. Hotkey, screenshot, voice. Slack/JIRA/Linear/Discord adapters. Self-hostable, BYOK LLM, MIT.",
   "author": {
     "name": "shimoverse",
@@ -100,6 +100,11 @@
       "import": "./dist/theme.js",
       "require": "./dist/theme.cjs"
     },
+    "./messages": {
+      "types": "./dist/messages.d.ts",
+      "import": "./dist/messages.js",
+      "require": "./dist/messages.cjs"
+    },
     "./headless": {
       "types": "./dist/headless/index.d.ts",
       "import": "./dist/headless/index.js",
@@ -176,6 +181,7 @@
     "eslint-plugin-react": "^7.33.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-security": "^3.0.0",
+    "html2canvas": "^1.4.1",
     "prettier": "^3.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

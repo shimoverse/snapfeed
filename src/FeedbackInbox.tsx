@@ -158,7 +158,7 @@ export interface FeedbackInboxProps {
   appName?: string
   /**
    * Accent color for highlights.
-   * @default "#D4714B"
+   * @default "#B85A36"
    */
   accentColor?: string
   /**
@@ -177,7 +177,7 @@ export function FeedbackInbox({
   supabaseKey,
   table = 'feedback',
   appName,
-  accentColor = '#D4714B',
+  accentColor = '#B85A36',
   theme = 'auto',
   className,
 }: FeedbackInboxProps) {

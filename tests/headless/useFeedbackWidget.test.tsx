@@ -1,19 +1,18 @@
-// @vitest-environment jsdom
 /**
  * Tests for src/headless/useFeedbackWidget.
  *
  * NOTE: All cases here are currently `it.todo`. Two infrastructure pieces
- * need to land before they can run:
- *   1. `jsdom` (devDep) — for the jsdom environment annotation above.
+ * still need to land before they can run:
+ *   1. jsdom (devDep) plus the vitest-environment pragma at the top of
+ *      this file (the literal pragma string is omitted here so vitest's
+ *      directive scanner does not pick it up out of a comment).
  *   2. `@testing-library/react` (devDep) — for `render` / `act` / hook
  *      utilities. The spec disallows adding it to runtime deps; it would
  *      go in devDependencies only.
- *   3. vitest.config.ts must include `tests/**\/*.test.tsx` in `include`
- *      (currently only `.test.ts`).
  *
- * Once those are in place, replace the `it.todo` calls with the
- * implementation sketches below. The intended assertions are documented
- * verbatim so a follow-up PR is mechanical.
+ * Once those are in place, add the pragma and replace the `it.todo` calls
+ * with the implementation sketches below. The intended assertions are
+ * documented verbatim so a follow-up PR is mechanical.
  */
 
 import { describe, it } from 'vitest'

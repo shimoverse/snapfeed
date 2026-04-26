@@ -4,7 +4,7 @@
 
 This is a checklist, not prose. Tick items as you complete them. The defaults snapfeed ships are safe for development; the items below are what you add for production.
 
-Last updated: 2026-04-25 (snapfeed v0.4.0)
+Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ---
 
@@ -19,7 +19,7 @@ Last updated: 2026-04-25 (snapfeed v0.4.0)
       ```
 - [ ] Sign your built image with `cosign`:
       ```bash
-      cosign sign --key <kms-key> registry.your-corp.com/snapfeed/worker:0.4.0
+      cosign sign --key <kms-key> registry.your-corp.com/snapfeed/worker:0.5.3
       ```
 - [ ] Generate an SBOM at build time (until v0.5 ships one in the upstream release):
       ```bash
@@ -248,7 +248,7 @@ Wire alerts on:
 ## 9. Updates
 
 - [ ] Subscribe to GitHub Releases for `shimoverse/snapfeed` (RSS or webhook).
-- [ ] Pin to a minor version range in `package.json`: `"snapfeed": "^0.4.0"` — accepts patch updates, blocks minors that may include breaking changes.
+- [ ] Pin to a minor version range in `package.json`: `"snapfeed": "^0.5.3"` — accepts patch updates, blocks minors that may include breaking changes.
 - [ ] Change-management ticket required for major-version bumps. Review `CHANGELOG.md` for breaking changes and run your full test suite against the new version in staging first.
 - [ ] **Security patches:** maintain a hotfix branch in your fork. On a CVE in snapfeed or a runtime dep, cherry-pick the fix, build, redeploy within your patch SLA.
 - [ ] Subscribe to `npm audit` notifications via your dependency scanner (Dependabot, Snyk, Renovate) so you see runtime CVEs the day they land.
@@ -355,7 +355,7 @@ services:
 $ curl -s https://feedback.internal.your-corp.com/healthz | jq
 {
   "ok": true,
-  "version": "0.4.0",
+  "version": "0.5.3",
   "adapters": ["slack", "jira", "file"],
   "auditLog": "/data/audit/snapfeed.jsonl",
   "uploadDir": "/data/uploads"

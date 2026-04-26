@@ -27,7 +27,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: snapfeed/worker:0.5.0
+    image: snapfeed/worker:0.5.3
     container_name: snapfeed-worker
     restart: unless-stopped
     ports:

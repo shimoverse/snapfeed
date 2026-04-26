@@ -1,6 +1,6 @@
 # Compatibility
 
-Browser, runtime, and framework compatibility for snapfeed v0.4.0.
+Browser, runtime, and framework compatibility for snapfeed v0.5.3.
 
 > If your environment isn't listed below, it probably still works — snapfeed targets standard Web Platform APIs (`fetch`, `MediaRecorder`, `getDisplayMedia`, `TextEncoder`) on the browser side and standard Node ESM/CJS interop on the server side. The matrices below cover what we actively test or have user reports for.
 

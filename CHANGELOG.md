@@ -6,6 +6,153 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-04-26
+
+Final pre-publish hardening pass after a four-agent deep review surfaced
+critical / high-priority drift across `src/`, `docs/`, `examples/`, and
+configs. This release lands the unblockers (every example app now builds
+clean), eliminates the promise-vs-reality gaps in the docs, and refreshes
+the lockfile + version stamps so first-time consumers do not hit
+documented-but-not-shipped surfaces. No new runtime features.
+
+### Fixed — Critical (build-blockers for consumers)
+- **`createFeedbackHandler` now satisfies Next 14's strict route validator.**
+  The handler input is typed as the standard web `Request` (Next 14 accepts
+  `Request | NextRequest`) and the return type is widened to `Response`
+  (NextResponse extends Response at runtime, so the actual returned object
+  satisfies both). Earlier the structural `NextRequest` shim caused
+  `next build` to fail with *"Type 'NextRequest' is not assignable to type
+  'Request | NextRequest'"* under strict tsconfig. `req.ip` is still read
+  via a small structural cast for Vercel platform support — no hard
+  dependency on `next/server`.
+- **`vitest` glob now matches `.tsx` files** (`tests/**/*.test.{ts,tsx}`).
+  The previous `*.test.ts` glob silently skipped two React component test
+  files in CI. The two `.tsx` files are still `it.todo` placeholders
+  pending `jsdom` + `@testing-library/react` devDeps; flipping the glob
+  surfaces them in the `27 todo` count instead of hiding them entirely.
+- **`snapfeed/messages` subpath now actually exports.** Promised in v0.5.2
+  CHANGELOG but the `package.json` exports + `tsup` entry were missing.
+  Now `import { defaultMessages, mergeMessages } from 'snapfeed/messages'`
+  resolves to a 1.9 KB ESM bundle with full `.d.ts`. (`defaultMessages` was
+  already importable from the main barrel; this adds the standalone
+  subpath consumers expected.)
+
+### Fixed — Examples (every example app now builds clean)
+- `examples/nextjs` builds via `next build`. Three blockers:
+  (1) handler typing fix above; (2) `app/page.tsx` marked
+  `dynamic = 'force-dynamic'` since it reads `process.env` at request time
+  AND mounts a client island that uses `useDevFeedback`; (3) custom
+  `app/not-found.tsx` opts out of the auto-generated 404 prerender.
+- `examples/remix` builds via `remix build`. Added `isbot@^4` (Remix
+  runtime requirement; was missing), committed `package-lock.json`, and
+  added `browserNodeBuiltinsPolyfill` to `remix.config.js` for `fs`,
+  `fs/promises`, `path`, `crypto`, `stream`, `url`, `util`, `buffer`. The
+  polyfills are needed because the `snapfeed` barrel re-exports
+  server-only adapters (`fileAdapter`, `googleSheetsAdapter`,
+  `defaultRateLimitStore`) that import node built-ins; tree-shaking
+  removes them at runtime, but Remix's bundler still needs to resolve
+  them at build time. (Splitting these out of the main barrel is on the
+  v0.6 roadmap.)
+- `examples/vite-react` and `examples/admin` continue to build clean —
+  verified end-to-end as part of this pass.
+
+### Fixed — Documentation drift
+- **`snapfeed/server/security` removed from public-API docs** in
+  `VERSIONING.md` and the `ARCHITECTURE.md` mindmap. The subpath does not
+  exist in `package.json` exports — only `defaultRateLimitStore` is
+  re-exported via the main barrel. Replaced with a row for the missing
+  `snapfeed/messages`, `snapfeed/headless`, and `snapfeed/theme`
+  subpaths that *do* ship.
+- **accentColor `#D4714B` → `#B85A36` swept across all surfaces** that
+  document the default. The contrast bump shipped in v0.5.2's runtime but
+  the docs lagged: `src/theme.ts`, `src/AnnotationCanvas.tsx`,
+  `src/FeedbackInbox.tsx` defaults; `README.md`, `docs/MANUAL.md`,
+  `docs/customization.md`; example apps (`examples/nextjs/app/`,
+  `examples/vite-react/`, `examples/remix/app/`) and their READMEs.
+- **`COMPLIANCE.md` no longer falsely claims `#D4714B` meets WCAG AA.**
+  The CHANGELOG explicitly shipped a fix for this contrast failure;
+  `COMPLIANCE.md` was still asserting the old (non-compliant) hex passes.
+  Now reflects the true `#B85A36` value (~4.7:1 against white) with the
+  history of the change.
+- **`docs/MANUAL.md` removed the `features.redact` row** from the LLM
+  feature toggles table. The toggle was advertised in early v0.4 drafts
+  but never landed (the source removed it from `LLMFeatureToggles` with a
+  TODO for v0.6). Both the table and the §6.6 code example now match the
+  shipped type.
+- **README's LLM example replaced** the fictional `defineLLM` import (no
+  such export exists) with the real `createProvider` + `applyLLM` shape
+  from `snapfeed/llm`.
+- **README + `SECURITY.md` updated** to reflect that SBOM, retention
+  policy, SSO/SAML for admin, and image-digest pinning slipped from v0.5
+  to v0.6. The README's "ships in v0.5" line in the Air-gapped section
+  now honestly says "slated for v0.6 (see SECURITY.md)".
+- **Stale `// Planned shape — ships in v0.4` comment** removed from the
+  README LLM example; that code block now describes the actually-shipped
+  v0.5.3 surface.
+- **Version stamps bumped** v0.4.0 → v0.5.3 across PRIVACY, COMPLIANCE,
+  THREAT_MODEL, COMPATIBILITY, PRD, MANUAL, PLAYBOOK, ARCHITECTURE,
+  SECURE_DEPLOYMENT, and the quickstart pin in `docs/quickstart/index.md`,
+  `docs/quickstart/midsize.md`, `docs/quickstart/corp.md`. The
+  `docs/SECURITY_REPORT.md` deliberately stays stamped v0.4.0 — it is a
+  historical assessment of that release; re-running the audit against
+  v0.5.3 is a separate effort.
+- **`CITATION.cff` 0.4.0 → 0.5.3.** **`docker/docker-compose.yml`
+  worker image tag `0.5.0` → `0.5.3`.** **`bug_report.yml` placeholder
+  `0.3.0` → `0.5.3`.**
+
+### Fixed — Code rot
+- **Stale hotkey-skip comment** in `FeedbackProvider.tsx` (lines
+  ~308–311) said the skip was conditional on the hotkey lacking `shift`.
+  The shipped behavior (since v0.5.2) ALWAYS skips on editable elements
+  regardless of modifiers — a tester typing into an autocomplete that
+  closes on blur could otherwise lose their input. Comment now matches
+  the code.
+- **Orphaned `<div data-snapfeed-media-row>` placeholder** removed from
+  `FeedbackWidget.tsx` (lines 985–989). It was reserved during the
+  v0.5.2-rc2 widget UX work for a media-button row that has not been
+  built yet; ship-the-real-thing-or-delete-the-stub.
+
+### Fixed — Build & devDep hygiene
+- **`package-lock.json` refreshed** — root version was lagging at 0.5.0
+  while `package.json` claimed 0.5.2; both now agree at 0.5.3.
+- **`html2canvas` added as a devDependency.** It is correctly an optional
+  peer at runtime, but `tsc --noEmit` and `tsup` dts emission both need
+  the types resolvable at dev time. Earlier installs got it transitively;
+  the lockfile refresh dropped it. Adding it as a devDep keeps
+  `type-check` and `build` green deterministically.
+- **ESLint flat-config ignore list extended** to cover
+  `examples/*/build/**`, `examples/*/dist/**`, and
+  `examples/*/public/build/**`. After running `npm run build` in the
+  example apps, those directories contained minified bundler output that
+  was being linted, producing 11,000+ false-positive `no-undef` errors.
+
+### Verification
+- `npm run type-check` clean.
+- `npm run build` clean — all 16 entry points (incl. new `messages`)
+  emit ESM + CJS + `.d.ts` + `.d.cts`.
+- `npx vitest run` — 48 test files, **602 passed | 12 skipped | 27 todo**,
+  0 unhandled errors.
+- `npm run lint` — 0 errors, 19 pre-existing warnings.
+- `npm pack --dry-run` — 124 files, 794 KB packed, 3.4 MB unpacked,
+  includes `dist/messages.{js,cjs,d.ts,d.cts}`.
+- `examples/nextjs`, `examples/remix`, `examples/vite-react`, and
+  `examples/admin` all build successfully end-to-end.
+
+### Known limitations carried into v0.6
+- Server-only adapters (`fileAdapter`, `googleSheetsAdapter`,
+  `defaultRateLimitStore`) still re-exported from the main `snapfeed`
+  barrel. This is why bundlers like Vite warn about node built-in
+  externalization and Remix needs polyfills. Splitting them out is a
+  v0.6 breaking change that will need a deprecation cycle.
+- The two `.tsx` test files (`tests/headless/`) remain `it.todo`
+  placeholders pending the `jsdom` + `@testing-library/react` devDeps;
+  the glob fix is the prerequisite.
+- LLM `features.redact` second-pass remains v0.6 roadmap. Use
+  `redactBeforeLLM: true` (regex + entropy) for outbound payload
+  redaction today.
+- README screenshots / visual walkthroughs not yet captured. Tracked for
+  the next pass with a running preview.
+
 ## [0.5.2] — 2026-04-26
 
 Pre-publish UX pass. Two thorough UX reviews (reporter + integrator) found

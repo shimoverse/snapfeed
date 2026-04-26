@@ -2,7 +2,7 @@
 
 > **Project-level privacy posture for the snapfeed open-source library.** This is *not* the privacy policy for any application that embeds snapfeed — that policy belongs to the consumer. See ["What to write in your own app's privacy policy"](#what-to-write-in-your-own-apps-privacy-policy) at the bottom for a copy-paste paragraph you can adapt.
 
-Last updated: 2026-04-26 (snapfeed v0.4.0)
+Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ---
 

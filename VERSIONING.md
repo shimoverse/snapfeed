@@ -26,7 +26,6 @@ Anything reachable from these subpath exports is part of the public API and prot
 | `snapfeed/adapters` | All adapter factories and the `FeedbackAdapter` / `FeedbackAdapterResult` interfaces |
 | `snapfeed/server/nextjs` | `createFeedbackHandler` for Next.js App Router |
 | `snapfeed/server/express` | `feedbackMiddleware` for Express ≥ 4 |
-| `snapfeed/server/security` | `validatePayload`, `checkOrigin`, `checkRateLimit`, `defaultRateLimitStore`, `normalizePayload`, exported `RateLimitStore` interface |
 | `snapfeed/routing` | `defineRouting`, `matchUrl`, `resolveRoute`, `mergeDestinations` |
 | `snapfeed/routing-sources` | `csvRoutingSource`, `googleSheetsRoutingSource`, `cacheRoutingSource` |
 | `snapfeed/llm` | `applyLLM`, `createProvider`, `createBudgetTracker`, `redactForLLM`, provider factories (`anthropicProvider`, `openaiProvider`, `ollamaProvider`) |
@@ -36,6 +35,9 @@ Anything reachable from these subpath exports is part of the public API and prot
 | `snapfeed/audit-log` | `fileAuditLog`, `noopAuditLog`, `multiAuditLog`, `AuditLog`, `AuditEvent` |
 | `snapfeed/network-capture` | `installNetworkCapture` and its config interface |
 | `snapfeed/campaigns` | `defineCampaign`, `isCampaignActive`, `getCampaignTags`, `getCampaignRouting`, `campaignShareUrl`, `ReleaseCampaign` |
+| `snapfeed/theme` | Theme-token data and CSS variable names |
+| `snapfeed/headless` | Headless compound components, `useFeedbackWidget` |
+| `snapfeed/messages` | `defaultMessages`, `mergeMessages`, `FeedbackMessages` type for i18n |
 
 Plus:
 

@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Title | snapfeed — internal-dogfooding feedback library |
-| Version | v0.4.0 |
+| Version | v0.5.3 |
 | Owner | shimoverse maintainers (snapfeed contributors) |
 | Last updated | 2026-04-26 |
-| Status | Shipped — v0.4.0 |
+| Status | Shipped — v0.5.3 |
 | Source repo | https://github.com/shimoverse/snapfeed |
 
 > This is an internal-quality PRD describing what snapfeed *is*, why it exists, what shipped, and what is deliberately out of scope. It is the artifact a fork should read first, the artifact a security reviewer should read after the THREAT_MODEL, and the artifact a decision-maker should read when asking "why does this library exist and should we adopt it?"
@@ -104,7 +104,7 @@ Six personas. Two are *installers* (mid-size eng manager, corp eng/QA lead), one
 
 ## 5. Success metrics
 
-Tracked on a rolling basis from the public v0.4.0 launch.
+Tracked on a rolling basis from the public v0.5.x launch.
 
 ### 5.1 Adoption
 - **100 GitHub stars by day 30.**
