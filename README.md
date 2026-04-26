@@ -63,9 +63,17 @@ export const POST = createFeedbackHandler({ adapters: autoAdapters() })
 ```
 
 ### 🏢 Self-hosted
-For startups and mid-size teams that want their own database, their own LLM key, no third-party data path. You run a Next.js (or Express) API route + Postgres + S3-compatible blob store for screenshots + optional Ollama for local LLM. Security defaults are on: origin allowlist, rate limit, payload caps, console-error redaction.
+For startups and mid-size teams that want their own database, their own LLM key, no third-party data path. v0.4 ships a Docker compose stack that boots a worker + MinIO (object store) + optional Ollama in one command:
 
-Today (v0.3), self-hosting = write a thin handler with `createFeedbackHandler`, point it at Supabase or your own webhook. The full Docker compose stack (Postgres + admin UI + worker) ships in **v0.5**.
+```bash
+cd docker
+cp .env.example .env
+docker compose up
+```
+
+Then point the widget at `http://<host>:8787/feedback`. Add `--profile llm` to also start a local Ollama. See [docker/README.md](./docker/README.md). Postgres-backed inbox + admin UI ship in **v0.6**.
+
+For deployments where you'd rather host the worker yourself in your existing Node app:
 
 ```ts
 // app/api/feedback/route.ts
@@ -86,7 +94,7 @@ export const POST = createFeedbackHandler({
 ```
 
 ### 🔒 Air-gapped
-For corporates and regulated industries where every new outbound domain needs a security review. The library is already air-gappable today: configure only `webhookAdapter` (pointed at your internal bug tracker) and `fileAdapter`. Disable the auto-adapter so no env var can leak an outbound destination. Self-host with no LLM. The full air-gapped install guide and signed offline tarball ship in **v0.5**. See [SECURITY.md](./SECURITY.md).
+For corporates and regulated industries where every new outbound domain needs a security review. v0.4 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. Image-digest pinning + signed tarball + SSO/SAML for the admin app ship in **v0.5**.
 
 ## Persona picker
 
@@ -140,7 +148,7 @@ import { FeedbackProvider } from 'snapfeed'
 </FeedbackProvider>
 ```
 
-> `buildId`, `gitSha`, and `env` props ship in **v0.4**. Today, pass them inside `user` or via your own metadata layer; the example is shown so docs and code line up when v0.4 lands.
+> `buildId`, `gitSha`, `env` props remain planned. Today, pass build context inside `user` or via your own metadata layer; first-class top-level props land in **v0.5** alongside the SSO admin work.
 
 ### Routing config
 
@@ -160,7 +168,7 @@ export default defineRouting({
 })
 ```
 
-> Tier 2 — reading the same routing table from a Google Sheet / Excel / CSV so a PM can edit without a deploy — ships in **v0.4**.
+> ✅ Shipped in **v0.4** — Tier 2 reads the same table from a Google Sheet / CSV so a PM can edit without a deploy. See `snapfeed/routing-sources`: `csvRoutingSource`, `googleSheetsRoutingSource`, `cacheRoutingSource` (polling wrapper with last-known-good fallback).
 
 ### LLM (BYOK, optional)
 
@@ -183,7 +191,7 @@ export default defineLLM({
 })
 ```
 
-> LLM features and voice capture ship in **v0.4**. Not in this release.
+> ✅ Shipped in **v0.4** — `snapfeed/llm` exposes `applyLLM`, `createProvider`, `createBudgetTracker`, and `redactForLLM` with providers for Anthropic, OpenAI (which also covers Azure OpenAI via `endpoint` + `headers`), and Ollama. Voice capture ships at `snapfeed/voice`; screen recording at `snapfeed/screen-recording`.
 
 ## Adapters
 
@@ -195,6 +203,9 @@ Built-in adapters (alphabetical):
 
 | Adapter | Status | Use it for |
 |---------|--------|------------|
+| `asanaAdapter` | ✅ v0.4 | Asana task per submission, optional screenshot attachment |
+| `autoAdapters` | ✅ v0.3 | Reads `SNAPFEED_*` env vars and wires automatically |
+| `clickUpAdapter` | ✅ v0.4 | ClickUp task with per-category priority |
 | `consoleAdapter` | ✅ shipped | Local dev, debugging |
 | `discordAdapter` | ✅ v0.3 | Indie / community / OSS teams |
 | `fileAdapter` | ✅ v0.3 | Local dev, audit log, Node-only |
@@ -202,11 +213,12 @@ Built-in adapters (alphabetical):
 | `googleSheetsAdapter` | ✅ v0.3 | Lightweight tracking, non-tech editing |
 | `jiraAdapter` | ✅ v0.3 | Mid-size / corporate workflows |
 | `linearAdapter` | ✅ v0.3 | Startup / product teams |
+| `msTeamsAdapter` | ✅ v0.4 | Adaptive Card via Teams incoming webhook |
+| `notionAdapter` | ✅ v0.4 | Notion page in a database, status + category select properties |
 | `slackAdapter` | ✅ shipped | Real-time team awareness |
 | `supabaseAdapter` | ✅ shipped | Postgres-backed inbox |
 | `telegramAdapter` | ✅ shipped | Solo / lightweight notifications |
 | `webhookAdapter` | ✅ shipped | Anything else (your own backend) |
-| `autoAdapters` | ✅ v0.3 | Reads `SNAPFEED_*` env vars and wires automatically |
 
 ### Writing a custom adapter
 
@@ -272,8 +284,8 @@ Threat model: "don't let our own widget become the leak." Defaults reflect that.
 
 | Phase | Cut as | Highlights |
 |-------|--------|------------|
-| v0.3 (this release) | now | Hygiene, file/auto/jira/linear/sheets/discord adapters, routing config, CLI, runnable Next.js example |
-| v0.4 | next | Voice capture, LLM (BYOK, all providers), spreadsheet-backed routing source, MS Teams adapter, audit log |
+| v0.3 | shipped | Hygiene, file/auto/jira/linear/sheets/discord adapters, routing config, CLI, runnable Next.js example |
+| v0.4 (this release) | now | MS Teams / Asana / ClickUp / Notion adapters; LLM (BYOK — Anthropic, OpenAI, Azure, Bedrock, Ollama); voice capture; screen recording; storage adapters (file, S3-compatible); spreadsheet-backed routing source (Sheets, CSV); audit log; network capture; Release Campaigns; Docker compose self-host stack; admin Next.js viewer |
 | v0.5 |  | Docker compose stack, admin UI (embed + standalone), SSO/SAML, full air-gapped install guide |
 | v1.0 |  | React Native SDK, screen recording rewind, network log capture, Release Campaigns, Vue/Svelte clients |
 

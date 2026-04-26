@@ -34,6 +34,18 @@ export type { LinearAdapterOptions } from './linear'
 export { googleSheetsAdapter } from './googleSheets'
 export type { GoogleSheetsAdapterOptions } from './googleSheets'
 
+export { msTeamsAdapter } from './msTeams'
+export type { MsTeamsAdapterOptions } from './msTeams'
+
+export { asanaAdapter } from './asana'
+export type { AsanaAdapterOptions } from './asana'
+
+export { clickUpAdapter } from './clickUp'
+export type { ClickUpAdapterOptions } from './clickUp'
+
+export { notionAdapter } from './notion'
+export type { NotionAdapterOptions } from './notion'
+
 export type {
   FeedbackAdapter,
   FeedbackAdapterResult,

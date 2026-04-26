@@ -4,3 +4,15 @@ dist/
 .DS_Store
 .env
 .env.local
+
+# Docker stack runtime data
+docker/data/
+docker/.env
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Audit + uploads written by file adapter / file storage / file audit log
+feedback.jsonl
+snapfeed-audit.jsonl
+snapfeed-uploads/

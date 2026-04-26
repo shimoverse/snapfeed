@@ -23,8 +23,22 @@ export { discordAdapter } from './adapters/discord'
 export { jiraAdapter } from './adapters/jira'
 export { linearAdapter } from './adapters/linear'
 export { googleSheetsAdapter } from './adapters/googleSheets'
+export { msTeamsAdapter } from './adapters/msTeams'
+export { asanaAdapter } from './adapters/asana'
+export { clickUpAdapter } from './adapters/clickUp'
+export { notionAdapter } from './adapters/notion'
 export { autoAdapters, AutoEnvKeys } from './adapters/auto'
 export type { AutoEnvKey } from './adapters/auto'
+
+// ─── Release Campaigns (isomorphic) ──────────────────────────────────────────
+export {
+  defineCampaign,
+  isCampaignActive,
+  getCampaignTags,
+  getCampaignRouting,
+  campaignShareUrl,
+} from './campaigns'
+export type { ReleaseCampaign } from './campaigns'
 
 // ─── Routing ──────────────────────────────────────────────────────────────────
 export { defineRouting, matchUrl, resolveRoute, mergeDestinations } from './routing'

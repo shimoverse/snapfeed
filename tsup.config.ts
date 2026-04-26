@@ -69,4 +69,84 @@ export default defineConfig([
     treeshake: true,
     outDir: 'dist',
   },
+  // LLM (Node-only — server-side BYOK)
+  {
+    entry: { 'llm/index': 'src/llm/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Voice capture (browser-only — uses MediaRecorder + getUserMedia)
+  {
+    entry: { voice: 'src/voice.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Storage adapters (Node-only — uses node:crypto + node:fs)
+  {
+    entry: { 'storage/index': 'src/storage/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Routing sources — Tier 2: spreadsheet + CSV (Node-only)
+  {
+    entry: { 'routing-sources/index': 'src/routing-sources/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Audit log (Node-only)
+  {
+    entry: { 'audit-log': 'src/audit-log.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Network capture (browser-only — patches fetch + XHR)
+  {
+    entry: { 'network-capture': 'src/network-capture.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Screen recording (browser-only — uses getDisplayMedia + MediaRecorder)
+  {
+    entry: { 'screen-recording': 'src/screen-recording.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Release Campaigns (isomorphic — pure data + helpers)
+  {
+    entry: { campaigns: 'src/campaigns.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
 ])

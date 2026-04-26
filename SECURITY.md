@@ -63,14 +63,16 @@ If your security team needs to approve snapfeed before adoption, here is what th
 - [x] **Pinned dependencies.** `package-lock.json` checked in.
 - [x] **Minimal runtime dependencies.** Zero hard runtime deps; `html2canvas` is an optional peer.
 - [x] **No `eval`, `Function()`, or dynamic remote imports** in the bundle.
-- [ ] **SBOM published per release.** _Planned for v0.4._
-- [ ] **Reproducible builds.** _Planned for v0.5._
+- [x] **Audit log primitive shipped** in v0.4 — `snapfeed/audit-log` exposes `fileAuditLog`, `noopAuditLog`, `multiAuditLog` with a discriminated `AuditEvent` union for `feedback.received`, `adapter.dispatched`, `llm.called`, `config.changed`, `rate_limit.hit`. Wire into `FeedbackHandlerConfig.onReceive` / `onComplete`.
+- [x] **Self-hostable Docker stack shipped** in v0.4 — `docker/docker-compose.yml` runs the worker + MinIO (+ optional Ollama for in-tenant LLM). No outbound calls during build or runtime beyond what you configure.
+- [ ] **SBOM published per release.** _Planned for v0.5 (`npm sbom` + GitHub Actions artifact)._
+- [ ] **Reproducible builds.** _Partially: `package-lock.json` pinned + `Dockerfile` builds deterministically. Image digests still TODO for v0.5._
 
 ### Coming in later releases
 
-- [ ] **Audit log.** Every config change, adapter dispatch, and LLM call recorded.
-- [ ] **Retention policy.** `retentionDays` config + `deleteByUserId()` API for GDPR right-to-erasure.
-- [ ] **SSO/SAML for admin.** OIDC + SAML for the self-hosted admin app.
+- [ ] **Retention policy.** `retentionDays` config + `deleteByUserId()` API for GDPR right-to-erasure. _Planned for v0.5._
+- [ ] **SSO/SAML for admin.** OIDC + SAML for the self-hosted admin app. _Planned for v0.5._
+- [ ] **Image digest pinning** in `docker/docker-compose.yml`. _Planned for v0.5._
 
 ---
 

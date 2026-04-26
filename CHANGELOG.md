@@ -6,6 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-04-26
+
+### Added — adapters
+- `msTeamsAdapter` — Microsoft Teams via incoming webhook, posts an Adaptive Card with per-category accents and optional AAD user mentions.
+- `asanaAdapter` — Asana REST v1; creates a task in a project, attaches screenshot via multipart.
+- `clickUpAdapter` — ClickUp REST v2; creates a task in a list, per-category priority map (urgent/high/normal/low).
+- `notionAdapter` — Notion REST; creates a page in a database with title/category/status select properties; embeds screenshot as a data-URI image block when ≤1 MB.
+
+### Added — LLM (BYOK, optional)
+- `snapfeed/llm` subpath: `applyLLM`, `createProvider`, `createBudgetTracker`, `redactForLLM`.
+- Providers: `anthropicProvider` (Messages API), `openaiProvider` (Chat Completions; also serves Azure OpenAI via `endpoint` + `headers`), `ollamaProvider` (local `/api/generate`).
+- Per-feature opt-in toggles: `title`, `severity`, `repro`, `redact`. Every feature falls back to a deterministic non-LLM behavior when disabled or when the daily token budget is exhausted.
+- Pre-LLM redaction: `redactForLLM` strips emails, credit-card-shaped digits, JWTs, and high-entropy tokens before the prompt is sent.
+
+### Added — Voice + Screen recording
+- `snapfeed/voice` — `createVoiceRecorder`, `isVoiceSupported`, `pickSupportedMimeType`. Browser-only `MediaRecorder` wrapper; auto-stop, mic release on stop/cancel.
+- `snapfeed/screen-recording` — `createScreenRecorder`, `isScreenRecordingSupported`. Browser-only `getDisplayMedia` + `MediaRecorder` wrapper; default 30s max duration; correctly parses data URLs whose MIME contains codec parameter commas.
+
+### Added — Storage
+- `snapfeed/storage` subpath: `fileStorage` (Node JSONL/file fallback) and `s3Storage` (S3-compatible — works with AWS S3, Cloudflare R2, Backblaze B2, MinIO; pure `node:crypto` AWS SigV4 signing, zero new runtime deps).
+
+### Added — Routing sources (Tier 2, non-dev editing)
+- `snapfeed/routing-sources` subpath: `csvRoutingSource` (Node fs read), `googleSheetsRoutingSource` (service-account JWT, read-only scope), `cacheRoutingSource` (polling wrapper with last-known-good fallback and `onUpdate`/`onError` hooks).
+
+### Added — Audit log
+- `snapfeed/audit-log` subpath: `fileAuditLog` (JSONL append, optional reporter hashing), `noopAuditLog`, `multiAuditLog`. Discriminated `AuditEvent` union covering `feedback.received`, `adapter.dispatched`, `llm.called`, `config.changed`, `rate_limit.hit`.
+
+### Added — Network capture
+- `snapfeed/network-capture` subpath: `installNetworkCapture` patches `window.fetch` + `XMLHttpRequest` and records the last N requests with method/url/status/duration. Origin redaction via `redactOrigins`, `ignoreUrls` skip-list, ring buffer.
+
+### Added — Release Campaigns
+- `snapfeed/campaigns` subpath: `defineCampaign`, `isCampaignActive`, `getCampaignTags`, `getCampaignRouting`, `campaignShareUrl`. Time-bound dogfooding sessions with optional feature-flag filter and routing override.
+
+### Added — Self-hosted Docker stack
+- `docker/docker-compose.yml` with `worker` + `minio` services and an optional `ollama` profile.
+- `docker/Dockerfile` multi-stage build on `node:20-alpine`, runs as non-root.
+- `docker/worker.cjs` — zero-runtime-dep Node http server wiring `autoAdapters` + `fileAuditLog` + `fileStorage` through `feedbackMiddleware`. Exposes `GET /healthz` and `POST /feedback`.
+- `docker/.env.example`, `docker/README.md`, `docker/.dockerignore`.
+
+### Added — Examples
+- `examples/admin/` — runnable Next.js app that reads a JSONL feedback file (the format `fileAdapter` writes), supports search, category filter, click-to-expand row with screenshot rendering. Read-only; write-back planned for v0.6.
+
+### Changed
+- Bumped to v0.4.0.
+- Refreshed package.json description and keywords (asana, clickup, notion, microsoft-teams, llm, byok, anthropic, openai, ollama, bedrock, voice-feedback, release-campaigns, audit-log).
+- New `tsup.config.ts` entries: `llm`, `voice`, `screen-recording`, `storage`, `routing-sources`, `audit-log`, `network-capture`, `campaigns`.
+- New `package.json` `exports` entries for each of the above subpaths.
+- Re-exported `defineCampaign`, `isCampaignActive`, `getCampaignTags`, `getCampaignRouting`, `campaignShareUrl`, `ReleaseCampaign` from the main `snapfeed` entry (campaigns are isomorphic).
+
+### Tests
+- 270+ tests passing across 30+ files. New coverage for every adapter, the LLM scaffolding (budget, redact, providers, runner with degradation paths), voice, screen recording, storage (file + S3 sigv4 shape), routing sources (csv, google sheets, cache wrapper), audit log, network capture, release campaigns, and the docker worker.
+
 ## [0.3.0] — 2026-04-26
 
 ### Added

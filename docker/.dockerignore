@@ -1,0 +1,42 @@
+# snapfeed Docker build ignore
+# Build context root is the repo root (../ from this file's dir).
+
+# Dependencies — installed inside the image
+node_modules/
+**/node_modules/
+
+# Build artifacts — rebuilt inside the image
+dist/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+docker/.env
+docker/data/
+
+# VCS metadata
+.git/
+.gitignore
+.github/
+
+# OS / editor cruft
+.DS_Store
+*.log
+*.swp
+.vscode/
+.idea/
+
+# Test/example fixtures (not needed at runtime)
+tests/
+examples/
+coverage/
+
+# Docs we don't ship in the image
+*.md
+docker/README.md
+!README.md
+
+# Misc
+.nvmrc
+.editorconfig

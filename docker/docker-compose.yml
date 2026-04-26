@@ -1,0 +1,80 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# snapfeed self-hosted stack (v0.5)
+#
+# Bring up with:    docker compose -f docker/docker-compose.yml up
+# Configure via:    docker/.env  (copy from docker/.env.example first)
+#
+# Services:
+#   worker    Node HTTP server hosting the snapfeed feedback handler
+#             (POST /feedback, GET /healthz). Always starts.
+#   minio     S3-compatible object storage for feedback media. Always starts.
+#   ollama    Optional in-tenant LLM. OFF by default — enable with:
+#                 docker compose --profile llm up
+#
+# Postgres is intentionally NOT included for v0.5. Feedback is appended to
+# an audit-log JSONL file, and uploaded media goes to MinIO. A v0.6 release
+# will add a Postgres-backed inbox.
+#
+# Air-gapped notes:
+#   - No outbound calls at runtime unless you configure SNAPFEED_* env vars
+#     pointing at external services (Slack, GitHub, etc.).
+#   - Image tags are named, not pinned by digest — see docker/README.md for
+#     reproducible-build guidance.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.9'
+
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: snapfeed/worker:0.5.0
+    container_name: snapfeed-worker
+    restart: unless-stopped
+    ports:
+      - "${WORKER_PORT:-8787}:8787"
+    env_file:
+      - ./.env
+    environment:
+      # Sensible in-container defaults; override in .env if you want different paths.
+      SNAPFEED_AUDIT_LOG_PATH: ${SNAPFEED_AUDIT_LOG_PATH:-/data/audit/snapfeed.jsonl}
+      SNAPFEED_UPLOAD_DIR: ${SNAPFEED_UPLOAD_DIR:-/data/uploads}
+      WORKER_PORT: "8787"
+    volumes:
+      - ./data/audit:/data/audit
+      - ./data/uploads:/data/uploads
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: snapfeed-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-snapfeed}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-snapfeed-dev-password}
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: snapfeed-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    profiles:
+      - llm

@@ -1,7 +1,7 @@
 {
   "name": "snapfeed",
-  "version": "0.3.0",
-  "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice (planned). Pluggable adapters: Slack, JIRA, Linear, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
+  "version": "0.4.0",
+  "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice. Pluggable adapters: Slack, JIRA, Linear, Asana, ClickUp, Notion, MS Teams, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. BYOK LLM (Anthropic, OpenAI, Azure, Bedrock, Ollama). Routing config + Release Campaigns. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
   "author": "snapfeed contributors",
   "license": "MIT",
   "keywords": [
@@ -25,6 +25,19 @@
     "google-sheets",
     "supabase",
     "telegram",
+    "asana",
+    "clickup",
+    "notion",
+    "microsoft-teams",
+    "llm",
+    "byok",
+    "anthropic",
+    "openai",
+    "ollama",
+    "bedrock",
+    "voice-feedback",
+    "release-campaigns",
+    "audit-log",
     "snapfeed"
   ],
   "repository": {
@@ -57,6 +70,46 @@
       "types": "./dist/routing.d.ts",
       "import": "./dist/routing.mjs",
       "require": "./dist/routing.cjs"
+    },
+    "./routing-sources": {
+      "types": "./dist/routing-sources/index.d.ts",
+      "import": "./dist/routing-sources/index.mjs",
+      "require": "./dist/routing-sources/index.cjs"
+    },
+    "./llm": {
+      "types": "./dist/llm/index.d.ts",
+      "import": "./dist/llm/index.mjs",
+      "require": "./dist/llm/index.cjs"
+    },
+    "./voice": {
+      "types": "./dist/voice.d.ts",
+      "import": "./dist/voice.mjs",
+      "require": "./dist/voice.cjs"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.mjs",
+      "require": "./dist/storage/index.cjs"
+    },
+    "./audit-log": {
+      "types": "./dist/audit-log.d.ts",
+      "import": "./dist/audit-log.mjs",
+      "require": "./dist/audit-log.cjs"
+    },
+    "./network-capture": {
+      "types": "./dist/network-capture.d.ts",
+      "import": "./dist/network-capture.mjs",
+      "require": "./dist/network-capture.cjs"
+    },
+    "./screen-recording": {
+      "types": "./dist/screen-recording.d.ts",
+      "import": "./dist/screen-recording.mjs",
+      "require": "./dist/screen-recording.cjs"
+    },
+    "./campaigns": {
+      "types": "./dist/campaigns.d.ts",
+      "import": "./dist/campaigns.mjs",
+      "require": "./dist/campaigns.cjs"
     },
     "./server/nextjs": {
       "types": "./dist/server/nextjs.d.ts",
