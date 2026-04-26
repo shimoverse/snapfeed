@@ -260,7 +260,12 @@ export function jiraAdapter(options: JiraAdapterOptions): FeedbackAdapter {
           }
         }
 
-        const created = (await createRes.json()) as { key?: string; id?: string }
+        // Guard against malformed 2xx bodies — fall through to the missing-key
+        // check below rather than crashing the adapter on a JSON parse error.
+        const created = (await createRes.json().catch(() => ({}))) as {
+          key?: string
+          id?: string
+        }
         const issueKey = created.key
         if (!issueKey) {
           return {

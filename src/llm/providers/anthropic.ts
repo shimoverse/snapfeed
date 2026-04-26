@@ -5,10 +5,17 @@
  * snapfeed never sees a key in transit; calls go directly to Anthropic
  * (or to `endpoint`, which a corp can point at an in-tenant proxy).
  *
+ * Custom endpoints (`config.endpoint`) are consumer-trusted: snapfeed
+ * validates the scheme (http/https only, throws otherwise) but does NOT
+ * validate the host. Consumers must ensure the URL points at a service
+ * they trust with payload contents and the API key. See
+ * `providers/endpoint.ts` for details.
+ *
  * Throws on non-2xx so the runner can catch and degrade gracefully.
  */
 
 import type { LLMConfig, LLMProvider } from '../types'
+import { validateEndpoint } from './endpoint'
 
 const DEFAULT_ENDPOINT = 'https://api.anthropic.com/v1/messages'
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'
@@ -17,6 +24,10 @@ const ANTHROPIC_VERSION = '2023-06-01'
 export function anthropicProvider(config: LLMConfig): LLMProvider {
   const endpoint = config.endpoint ?? DEFAULT_ENDPOINT
   const model = config.model ?? DEFAULT_MODEL
+
+  // Validate at construction so a bad endpoint surfaces immediately rather
+  // than at the first .complete() call. Throws synchronously.
+  if (config.endpoint) validateEndpoint(endpoint, 'anthropic')
 
   return {
     name: 'anthropic',

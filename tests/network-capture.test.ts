@@ -237,3 +237,76 @@ describe('installNetworkCapture — XHR', () => {
     expect(FakeXHR.prototype.send).toBe(originalSend)
   })
 })
+
+// ─── Cooperation with downstream patches ────────────────────────────────────
+
+describe('installNetworkCapture — overlapping patches (cooperation)', () => {
+  it('uninstall() does NOT clobber a downstream fetch wrapper installed AFTER snapfeed', async () => {
+    const original = vi.fn(
+      async () => new Response('ok', { status: 200 })
+    ) as unknown as typeof fetch
+    stubBrowser({ fetch: original })
+
+    const cap = installNetworkCapture()
+    const snapfeedWrapper = window.fetch
+    expect(snapfeedWrapper).not.toBe(original)
+
+    // Now a downstream library wraps on top of snapfeed (e.g. analytics).
+    const downstream: typeof window.fetch = (input, init) =>
+      snapfeedWrapper(input, init)
+    window.fetch = downstream
+
+    cap.uninstall()
+
+    // Snapfeed left the chain alone — `downstream` is still the live fetch.
+    // Restoring `original` here would have silently broken the downstream
+    // library's instrumentation.
+    expect(window.fetch).toBe(downstream)
+  })
+
+  it('uninstall() DOES restore when our wrapper is still the live window.fetch', async () => {
+    const original = vi.fn(
+      async () => new Response('ok', { status: 200 })
+    ) as unknown as typeof fetch
+    stubBrowser({ fetch: original })
+
+    const cap = installNetworkCapture()
+    expect(window.fetch).not.toBe(original)
+    cap.uninstall()
+    expect(window.fetch).toBe(original)
+  })
+
+  it('uninstall() does NOT clobber a downstream XHR.open/send wrap installed AFTER snapfeed', () => {
+    stubBrowser()
+    const cap = installNetworkCapture()
+    const snapfeedOpen = FakeXHR.prototype.open
+    const snapfeedSend = FakeXHR.prototype.send
+
+    // Downstream library wraps on top of snapfeed.
+    const downstreamOpen = function (
+      this: XMLHttpRequest,
+      ...args: unknown[]
+    ) {
+      return (snapfeedOpen as unknown as (...a: unknown[]) => unknown).apply(
+        this,
+        args
+      )
+    } as unknown as typeof FakeXHR.prototype.open
+    const downstreamSend = function (
+      this: XMLHttpRequest,
+      ...args: unknown[]
+    ) {
+      return (snapfeedSend as unknown as (...a: unknown[]) => unknown).apply(
+        this,
+        args
+      )
+    } as unknown as typeof FakeXHR.prototype.send
+    FakeXHR.prototype.open = downstreamOpen
+    FakeXHR.prototype.send = downstreamSend
+
+    cap.uninstall()
+
+    expect(FakeXHR.prototype.open).toBe(downstreamOpen)
+    expect(FakeXHR.prototype.send).toBe(downstreamSend)
+  })
+})

@@ -17,7 +17,7 @@ Then open <http://localhost:3000>. With `SNAPFEED_ADMIN_BYPASS=1` set, you'll
 be auto-authenticated as a stub admin — flip it off (or remove the env var)
 to require an SSO header.
 
-## What's new in v0.4
+## What's new in v0.5
 
 - **Filters bar** with date range, category, status, reporter, page-URL
   contains, has-screenshot, campaign, and free-text search. Filters live in

@@ -160,4 +160,29 @@ describe('csvRoutingSource', () => {
     const config = await source.fetch()
     expect(config!.routes[0]!.to.labels).toEqual(['bug', 'triage'])
   })
+
+  it('strips a leading UTF-8 BOM (Excel-saved CSVs)', async () => {
+    const file = tmpPath()
+    // Excel and many editors prepend a BOM (U+FEFF) when saving CSV. Without
+    // stripping, the first column header becomes "BOM+match" and the
+    // column-index lookup misses, producing an empty (but non-throwing) config.
+    const bom = '﻿'
+    await writeFile(
+      file,
+      bom +
+        [
+          'match,flag,category,team,slack,jira,linear,github,discord,sheet,assignee,labels',
+          '/checkout,,,payments,#checkout,,,,,,,bug',
+        ].join('\n'),
+      'utf8'
+    )
+
+    const source = csvRoutingSource({ path: file })
+    const config = await source.fetch()
+    expect(config).toBeDefined()
+    expect(config!.routes).toHaveLength(1)
+    expect(config!.routes[0]!.match).toBe('/checkout')
+    expect(config!.routes[0]!.to.team).toBe('payments')
+    expect(config!.routes[0]!.to.labels).toEqual(['bug'])
+  })
 })

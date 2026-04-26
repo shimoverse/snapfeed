@@ -74,4 +74,22 @@ describe('useFeedbackWidget', () => {
     //   expect(result.current.form.screenshot).toBeNull()
     //   expect(result.current.error).toBeNull()
   )
+
+  // ── v0.5.2 hardening additions ────────────────────────────────────────
+
+  it.todo(
+    'FeedbackWidget: success-close timer is cleared when the widget is closed and reopened quickly'
+    //   open the widget, submit, get into the 2s success-close window
+    //   close the widget within that window, then reopen
+    //   wait > 2s
+    //   the widget must remain open — the stale handleClose from the
+    //   previous cycle must NOT have fired (it would clobber the reopen).
+  )
+
+  it.todo(
+    'FeedbackWidget: success-close timer is cleared on unmount'
+    //   open + submit, then unmount the FeedbackProvider before the 2s
+    //   timer fires. No "setState on unmounted component" warning, no
+    //   leaked timer. (Verifiable by spying on clearTimeout.)
+  )
 })

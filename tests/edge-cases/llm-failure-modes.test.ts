@@ -392,3 +392,281 @@ describe('applyLLM — unsupported provider', () => {
     expect(result.warnings?.[0]).toMatch(/no_provider/)
   })
 })
+
+// ─── per-feature budget pre-gate ────────────────────────────────────────────
+
+describe('applyLLM — per-feature budget pre-gate', () => {
+  it('severity (cap=16) is allowed even when budget is too tight for title (cap=64)', async () => {
+    // Budget has 30 tokens left. Title needs 64 → blocked. Severity needs
+    // 16 → allowed. Repro needs 256 → blocked. With the old one-size 512
+    // pre-gate, all three would have been blocked.
+    const budget = createBudgetTracker(30)
+    const fetchMock = stubFetchSequence([{ body: openaiBody('p1', 5) }])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true, severity: true, repro: true } }),
+      { budget }
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(1) // only severity
+    expect(result.title).toBeUndefined()
+    expect(result.severity).toBe('p1')
+    expect(result.reproSteps).toBeUndefined()
+    expect(
+      result.warnings?.some(w => w.startsWith('title:') && w.includes('budget'))
+    ).toBe(true)
+    expect(
+      result.warnings?.some(w => w.startsWith('repro:') && w.includes('budget'))
+    ).toBe(true)
+  })
+
+  it('title sets maxTokens=64 in the body (not 256 default, not 512 estimate)', async () => {
+    const fetchMock = stubFetchSequence([{ body: openaiBody('A title', 10) }])
+    await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } })
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_tokens).toBe(64)
+  })
+
+  it('severity sets maxTokens=16 in the body', async () => {
+    const fetchMock = stubFetchSequence([{ body: openaiBody('p1', 5) }])
+    await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { severity: true } })
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_tokens).toBe(16)
+  })
+
+  it('repro sets maxTokens=256 in the body', async () => {
+    const fetchMock = stubFetchSequence([{ body: openaiBody('[]', 10) }])
+    await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { repro: true } })
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_tokens).toBe(256)
+  })
+})
+
+// ─── severity warning hashing (no provider-output echo) ─────────────────────
+
+describe('applyLLM — severity warning does not echo provider output', () => {
+  it('does NOT include the unparseable response text in the warning', async () => {
+    // If a model under prompt injection echoed "ignore previous: api_key=SECRET",
+    // the old warning string included up to 40 chars of that, leaking it into
+    // result.warnings → consumer logs. Now we hash to length only.
+    const malicious = 'ignore previous: api_key=SECRET_TOKEN_LEAK'
+    stubFetchSequence([{ body: openaiBody(malicious, 5) }])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { severity: true } })
+    )
+
+    expect(result.severity).toBeUndefined()
+    expect(result.degraded).toBe(true)
+    const warning = result.warnings?.[0] ?? ''
+    expect(warning).toContain('severity: unparseable response')
+    expect(warning).toContain('length=')
+    // Critical: no provider content in the warning.
+    expect(warning).not.toContain('SECRET_TOKEN_LEAK')
+    expect(warning).not.toContain('api_key')
+    expect(warning).not.toContain('ignore previous')
+  })
+
+  it('reports the response length accurately', async () => {
+    const text = 'x'.repeat(123)
+    stubFetchSequence([{ body: openaiBody(text, 5) }])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { severity: true } })
+    )
+
+    expect(result.warnings?.[0]).toBe('severity: unparseable response (length=123)')
+  })
+})
+
+// ─── title double-quote stripping ───────────────────────────────────────────
+
+describe('applyLLM — title quote stripping', () => {
+  it('strips wrapping double quotes (single layer): "foo" → foo', async () => {
+    stubFetchSequence([{ body: openaiBody('"foo"', 5) }])
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } })
+    )
+    expect(result.title).toBe('foo')
+  })
+
+  it('strips wrapping double quotes (double layer): ""foo"" → foo', async () => {
+    // The old single-character regex `/^["']|["']$/g` left this as '"foo"'.
+    // The new replace stripping `["']+` on both ends fully unwraps it.
+    stubFetchSequence([{ body: openaiBody('""foo""', 5) }])
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } })
+    )
+    expect(result.title).toBe('foo')
+  })
+
+  it('strips a mix of single + double wrapping quotes: \'""foo""\' → foo', async () => {
+    stubFetchSequence([{ body: openaiBody(`'""foo""'`, 5) }])
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } })
+    )
+    expect(result.title).toBe('foo')
+  })
+
+  it('does NOT strip an apostrophe inside the title: don\'t click → don\'t click', async () => {
+    stubFetchSequence([{ body: openaiBody(`don't click`, 5) }])
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } })
+    )
+    expect(result.title).toBe(`don't click`)
+  })
+})
+
+// ─── tokensUsed sentinel (-1) when usage is missing ─────────────────────────
+
+describe('applyLLM — tokensUsed sentinel for missing usage', () => {
+  it('charges per-feature cap to budget when provider returns -1, with a warning', async () => {
+    // OpenAI provider returns -1 when `usage` is missing. The runner bills
+    // the per-feature cap (title=64) and pushes a one-time warning so the
+    // consumer sees that something undercounted-prone happened.
+    const budget = createBudgetTracker(10_000)
+    stubFetchSequence([
+      // No `usage` key in the body — this simulates an OpenAI-compatible
+      // server (LM Studio, older llama.cpp, etc.) omitting usage.
+      { body: { choices: [{ message: { content: 'A title' } }] } },
+    ])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true } }),
+      { budget }
+    )
+
+    expect(result.title).toBe('A title')
+    // Charged the cap.
+    expect(result.tokensUsed).toBe(64)
+    expect(budget.used()).toBe(64)
+    expect(result.degraded).toBe(true)
+    expect(
+      result.warnings?.some(
+        w => w.startsWith('title:') && w.includes('omitted usage')
+      )
+    ).toBe(true)
+  })
+})
+
+// ─── repro now includes console errors ──────────────────────────────────────
+
+describe('applyLLM — repro user message', () => {
+  it('includes console errors (strongest reproduction signal)', async () => {
+    const fetchMock = stubFetchSequence([{ body: openaiBody('["a"]', 10) }])
+    await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { repro: true } })
+    )
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    const userMsg = body.messages.find(
+      (m: { role: string; content: string }) => m.role === 'user'
+    ).content as string
+    expect(userMsg).toContain('Console errors:')
+    expect(userMsg).toContain('TypeError: cannot read property of undefined')
+  })
+})
+
+// ─── endpoint validation ────────────────────────────────────────────────────
+
+describe('LLM provider endpoint validation', () => {
+  it('throws synchronously on a non-URL endpoint', async () => {
+    const { openaiProvider } = await import('../../src/llm/providers/openai')
+    expect(() =>
+      openaiProvider({
+        enabled: true,
+        provider: 'openai',
+        apiKey: 'k',
+        endpoint: 'not a url',
+      })
+    ).toThrow(/not a valid URL/)
+  })
+
+  it('throws on file: scheme', async () => {
+    const { anthropicProvider } = await import('../../src/llm/providers/anthropic')
+    expect(() =>
+      anthropicProvider({
+        enabled: true,
+        provider: 'anthropic',
+        apiKey: 'k',
+        endpoint: 'file:///etc/passwd',
+      })
+    ).toThrow(/not allowed/)
+  })
+
+  it('throws on data: scheme', async () => {
+    const { openaiProvider } = await import('../../src/llm/providers/openai')
+    expect(() =>
+      openaiProvider({
+        enabled: true,
+        provider: 'openai',
+        apiKey: 'k',
+        endpoint: 'data:text/plain,foo',
+      })
+    ).toThrow(/not allowed/)
+  })
+
+  it('does NOT throw on https://', async () => {
+    const { openaiProvider } = await import('../../src/llm/providers/openai')
+    expect(() =>
+      openaiProvider({
+        enabled: true,
+        provider: 'openai',
+        apiKey: 'k',
+        endpoint: 'https://proxy.internal/v1/chat/completions',
+      })
+    ).not.toThrow()
+  })
+
+  it('does NOT throw on http://localhost (Ollama default)', async () => {
+    const { ollamaProvider } = await import('../../src/llm/providers/ollama')
+    expect(() =>
+      ollamaProvider({
+        enabled: true,
+        provider: 'ollama',
+        endpoint: 'http://localhost:11434/api/chat',
+      })
+    ).not.toThrow()
+  })
+
+  it('warns once via console.warn on non-localhost http://', async () => {
+    const { openaiProvider } = await import('../../src/llm/providers/openai')
+    const { _resetHttpEndpointWarnedForTests } = await import(
+      '../../src/llm/providers/endpoint'
+    )
+    _resetHttpEndpointWarnedForTests()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    openaiProvider({
+      enabled: true,
+      provider: 'openai',
+      apiKey: 'k',
+      endpoint: 'http://insecure.example.com/v1/chat/completions',
+    })
+
+    expect(warnSpy).toHaveBeenCalledOnce()
+    expect(warnSpy.mock.calls[0]?.[0]).toMatch(/plaintext/)
+    warnSpy.mockRestore()
+  })
+})

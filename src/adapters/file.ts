@@ -8,6 +8,13 @@
  * **Node only.** Returns `{ ok: false, error: 'fileAdapter requires Node' }`
  * in browsers, edge runtimes, or any environment without `process.versions.node`.
  *
+ * **Security warning.** `path` MUST be a developer-supplied constant (or
+ * derived from one) — never request data, query params, or user-submitted
+ * payload fields. `path.resolve()` and similar APIs do NOT prevent traversal
+ * (`../../etc/passwd` resolves cleanly), and the adapter will happily
+ * `mkdir -p` and append to whatever absolute path you give it. Treat this
+ * option the same way you'd treat a hard-coded log file location.
+ *
  * @example
  * import { fileAdapter } from 'snapfeed/adapters'
  *

@@ -32,7 +32,12 @@ import type {
 export type LinearPriority = 0 | 1 | 2 | 3 | 4
 
 export interface LinearAdapterOptions {
-  /** Linear API key (Personal API key or OAuth token). */
+  /**
+   * Linear API key. Personal API keys (`lin_api_...`) are sent raw in the
+   * `Authorization` header — the documented Linear convention. OAuth tokens
+   * (detected by a `lin_oauth_` prefix or a JWT-style `.` in the value) are
+   * automatically prefixed with `Bearer `.
+   */
   apiKey: string
   /** Team ID to create issues under. */
   teamId: string
@@ -87,6 +92,18 @@ function buildTitle(payload: FeedbackPayload): string {
   const truncated =
     payload.text.length > 80 ? `${payload.text.slice(0, 80)}…` : payload.text
   return `[Feedback] ${head}${truncated}`.trim()
+}
+
+/**
+ * Linear accepts Personal API keys raw (e.g. `lin_api_...`) but OAuth tokens
+ * must be prefixed with `Bearer `. Detection is conservative: only known
+ * OAuth shapes get the prefix; everything else is sent as-is.
+ */
+function buildAuthHeader(apiKey: string): string {
+  if (apiKey.startsWith('lin_oauth_') || apiKey.includes('.')) {
+    return `Bearer ${apiKey}`
+  }
+  return apiKey
 }
 
 function buildDescription(
@@ -193,16 +210,34 @@ export function linearAdapter(options: LinearAdapterOptions): FeedbackAdapter {
     throw new Error('[linearAdapter] apiKey and teamId are required')
   }
 
+  const authHeader = buildAuthHeader(apiKey)
+
   return {
     name: 'linear',
     async send(payload: FeedbackPayload): Promise<FeedbackAdapterResult> {
-      const embedScreenshot =
-        includeScreenshotAsAttachment && embedScreenshotAsDataUri
+      const wantsScreenshot =
+        includeScreenshotAsAttachment &&
+        embedScreenshotAsDataUri &&
+        !!payload.screenshot?.base64
+
+      const warnings: string[] = []
+      let description: string
+
+      // Building the description with the data URI is pure string work and
+      // unlikely to throw — but if it does (e.g. a future change adds decoding),
+      // we want the issue to still be created without the screenshot.
+      try {
+        description = buildDescription(payload, wantsScreenshot)
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err)
+        warnings.push(`screenshot upload failed: ${detail}`)
+        description = buildDescription(payload, false)
+      }
 
       const input: Record<string, unknown> = {
         teamId,
         title: buildTitle(payload),
-        description: buildDescription(payload, embedScreenshot),
+        description,
       }
 
       if (projectId) input.projectId = projectId
@@ -218,7 +253,7 @@ export function linearAdapter(options: LinearAdapterOptions): FeedbackAdapter {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: apiKey,
+            Authorization: authHeader,
           },
           body: JSON.stringify({
             query: ISSUE_CREATE_MUTATION,
@@ -234,7 +269,9 @@ export function linearAdapter(options: LinearAdapterOptions): FeedbackAdapter {
           }
         }
 
-        const json = (await res.json()) as LinearGraphQLResponse
+        // Guard against malformed 2xx bodies — a parse failure here will be
+        // caught below as "no issue identifier" rather than crashing the adapter.
+        const json = (await res.json().catch(() => ({}))) as LinearGraphQLResponse
 
         // GraphQL can return 200 with errors[] populated.
         if (json.errors && json.errors.length > 0) {
@@ -250,7 +287,9 @@ export function linearAdapter(options: LinearAdapterOptions): FeedbackAdapter {
           }
         }
 
-        return { ok: true, deliveryId: issue.identifier }
+        return warnings.length > 0
+          ? { ok: true, deliveryId: issue.identifier, warnings }
+          : { ok: true, deliveryId: issue.identifier }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         return { ok: false, error: `Linear adapter error: ${message}` }

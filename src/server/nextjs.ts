@@ -45,21 +45,50 @@ type NextResponse = {
   json(body: unknown, init?: { status?: number; headers?: Record<string, string> }): NextResponse
 }
 
+type NextServerModule = {
+  NextResponse: {
+    json(
+      body: unknown,
+      init?: { status?: number; headers?: Record<string, string> }
+    ): NextResponse
+  }
+}
+
+// Module-scoped cache for the dynamically imported `next/server` module.
+// Without this, every request paid for a fresh `await import(...)` round-trip
+// and the resolution-cache lookup it implies. Cached as the resolved promise
+// so concurrent first-requests share the same in-flight import.
+let nextServerPromise: Promise<NextServerModule> | undefined
+
+async function loadNextServer(): Promise<NextServerModule> {
+  if (nextServerPromise) return nextServerPromise
+  nextServerPromise = (async () => {
+    try {
+      return (await import('next/server' as string)) as NextServerModule
+    } catch (err) {
+      // Reset so a future request can retry (useful in tests / hot reload).
+      nextServerPromise = undefined
+      throw new Error(
+        'createFeedbackHandler requires Next.js. Install next or use ' +
+          'feedbackMiddleware from snapfeed/server/express. ' +
+          `(underlying error: ${err instanceof Error ? err.message : String(err)})`
+      )
+    }
+  })()
+  return nextServerPromise
+}
+
 /**
  * Creates a Next.js App Router POST handler that runs your adapters
  * with built-in rate limiting, payload validation, and origin checking.
  */
 export function createFeedbackHandler(config: FeedbackHandlerConfig) {
+  // One-time production warning when the origin allowlist is effectively
+  // disabled. Emitted at handler-construction time, not per-request.
+  warnIfOriginsOpenInProd(config)
+
   return async function POST(req: NextRequest): Promise<NextResponse> {
-    // Dynamic import to keep next/server as a soft peer dep
-    const { NextResponse: NR } = await import('next/server' as string) as {
-      NextResponse: {
-        json(
-          body: unknown,
-          init?: { status?: number; headers?: Record<string, string> }
-        ): NextResponse
-      }
-    }
+    const { NextResponse: NR } = await loadNextServer()
 
     // Audit log helper. Failures are caught and logged via `console.error` —
     // audit logging never breaks the request flow.
@@ -185,4 +214,26 @@ export function createFeedbackHandler(config: FeedbackHandlerConfig) {
       results: adapterResults.map(r => ({ ok: r.ok, error: r.error })),
     })
   }
+}
+
+/**
+ * Emit a one-time `console.warn` if the handler is constructed in production
+ * with no `allowedOrigins` allowlist. An empty allowlist is treated as
+ * allow-all (see `checkOrigin` in `./security`) — useful in development but
+ * dangerous as a production default.
+ */
+function warnIfOriginsOpenInProd(config: FeedbackHandlerConfig): void {
+  if (typeof process === 'undefined') return
+  if (process.env?.NODE_ENV !== 'production') return
+  if (config.allowedOrigins && config.allowedOrigins.length > 0) return
+  console.warn(
+    '[snapfeed] allowedOrigins is empty in production — origin allowlist is ' +
+      'effectively disabled (allow-all). Set allowedOrigins to lock down ' +
+      'accepted browser origins.'
+  )
+}
+
+/** Test-only: reset the cached `next/server` import. */
+export function __resetNextServerCacheForTesting(): void {
+  nextServerPromise = undefined
 }

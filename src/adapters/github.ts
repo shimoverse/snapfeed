@@ -185,7 +185,12 @@ export function githubAdapter(options: GitHubAdapterOptions): FeedbackAdapter {
           }
         }
 
-        const data = (await res.json()) as { number?: number; html_url?: string }
+        // Guard against malformed 2xx bodies — drop deliveryId rather than
+        // crashing the adapter on a JSON parse error.
+        const data = (await res.json().catch(() => ({}))) as {
+          number?: number
+          html_url?: string
+        }
         return {
           ok: true,
           deliveryId: data.number ? String(data.number) : undefined,

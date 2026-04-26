@@ -52,10 +52,19 @@ export function fileStorage(options: FileStorageOptions = {}): StorageAdapter {
     toUrl,
   } = options
 
-  let dirEnsured = false
+  // Memoized mkdir promise. Race-safe — concurrent uploads await the same
+  // in-flight `mkdir` rather than each kicking off their own. A previous
+  // boolean-flag implementation could fire N parallel mkdirs on cold start.
+  let dirPromise: Promise<void> | undefined
 
   return {
     name: 'file',
+    /**
+     * Writes `input.bytes` to the configured directory. The filename is
+     * **sanitized** with `path.basename(input.filename)` — any directory
+     * components (e.g. `../../../etc/passwd`) are stripped so writes always
+     * stay inside the configured `dir`.
+     */
     async upload(input: StorageUploadInput): Promise<StorageUploadResult> {
       const isNode =
         typeof process !== 'undefined' &&
@@ -70,12 +79,12 @@ export function fileStorage(options: FileStorageOptions = {}): StorageAdapter {
       const path = await import('node:path')
 
       const absoluteDir = path.isAbsolute(dir) ? dir : path.resolve(process.cwd(), dir)
-      if (!dirEnsured) {
-        await fs.mkdir(absoluteDir, { recursive: true })
-        dirEnsured = true
-      }
+      await (dirPromise ??= fs.mkdir(absoluteDir, { recursive: true }).then(() => undefined))
 
-      const safeName = `${prefix()}-${input.filename}`
+      // Strip any directory components from the caller-supplied filename to
+      // prevent path traversal (`../../etc/passwd` → `passwd`).
+      const sanitizedFilename = path.basename(input.filename)
+      const safeName = `${prefix()}-${sanitizedFilename}`
       const absolutePath = path.join(absoluteDir, safeName)
 
       await fs.writeFile(absolutePath, input.bytes)

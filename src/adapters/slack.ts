@@ -36,6 +36,22 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
     iconEmoji = ':pencil:',
   } = options
 
+  // Validate the webhook URL at construction time so misconfiguration is
+  // surfaced when the adapter is wired up — not lazily on the first feedback
+  // submission, when the user can no longer correlate the error with their
+  // setup. We accept any URL the URL parser accepts (so tests can pass
+  // localhost mocks), but reject obviously empty / unparseable values.
+  try {
+    // We construct a URL purely for its side-effect of throwing on invalid
+    // input. Assign to `void` so the no-new lint rule (and human readers)
+    // know the new is intentional.
+    void new URL(webhookUrl)
+  } catch {
+    throw new Error(
+      'slackAdapter: webhookUrl must look like https://hooks.slack.com/services/T.../B.../...'
+    )
+  }
+
   return {
     name: 'slack',
     async send(payload: FeedbackPayload): Promise<FeedbackAdapterResult> {

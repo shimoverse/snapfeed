@@ -53,6 +53,11 @@ export { captureScreenshot, fileToScreenshot, extractImageFromClipboard } from '
 export { lightTheme, darkTheme, themeToCss, extendTheme } from './theme'
 export type { SnapfeedTheme, DeepPartial } from './theme'
 
+// ─── i18n / message strings ──────────────────────────────────────────────────
+// Defaults + merger for every user-facing string in the widget UI. Override
+// any subset via `FeedbackProviderConfig.messages` to translate or rebrand.
+export { defaultMessages, mergeMessages, formatMessage } from './messages'
+
 // Headless API — see `snapfeed/headless` for the customization surface
 // (compound components, render-prop, slot-swap provider).
 
@@ -61,6 +66,7 @@ export type {
   FeedbackPayload,
   FeedbackUser,
   FeedbackMetadata,
+  FeedbackMessages,
   FeedbackScreenshot,
   FeedbackAdapter,
   FeedbackAdapterResult,

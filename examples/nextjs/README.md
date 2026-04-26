@@ -5,16 +5,14 @@ A minimal runnable Next.js 14 app that uses the local `snapfeed` package
 
 ## Quickstart
 
-1. **Copy env template** — `cp .env.example .env.local`
-2. **Set at least one destination** — uncomment one `SNAPFEED_*` block in
+1. **Build the local snapfeed package** — from the snapfeed repo root, run
+   `npm install && npm run build` (the example imports from `dist/`)
+2. **Copy env template** — `cp .env.example .env.local`
+3. **Set at least one destination** — uncomment one `SNAPFEED_*` block in
    `.env.local` (e.g. `SNAPFEED_FILE_PATH=feedback.jsonl` for a no-setup demo)
-3. **Install** — `npm install` (this also builds the local snapfeed lib)
-4. **Run** — `npm run dev`
-5. **Try it** — open <http://localhost:3000>, then press **Ctrl+Shift+F**
-
-## Demo
-
-![](./snapfeed-demo.png)
+4. **Install** — `npm install` (resolves the local `snapfeed` via `file:../..`)
+5. **Run** — `npm run dev`
+6. **Try it** — open <http://localhost:3000>, then press **Ctrl+Shift+F**
 
 ## What's wired up
 

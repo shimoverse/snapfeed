@@ -149,6 +149,39 @@ describe('noopAuditLog', () => {
   })
 })
 
+describe('fileAuditLog — write failures never break the request flow', () => {
+  it('swallows EACCES on appendFile and logs to console.error', async () => {
+    // Point at a path that mkdir cannot create (e.g. under /dev/null/...) so
+    // the entire write pipeline fails. We assert the promise resolves rather
+    // than rejecting, and that console.error fired.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const log = fileAuditLog({ path: '/dev/null/cant-write/audit.jsonl' })
+      await expect(log.record(sampleReceived)).resolves.toBeUndefined()
+      expect(errSpy).toHaveBeenCalled()
+      const firstCall = errSpy.mock.calls[0]!
+      expect(String(firstCall[0])).toMatch(/audit-log write failed/i)
+    } finally {
+      errSpy.mockRestore()
+    }
+  })
+
+  it('swallows the failure even when ensureDir fails on a readonly parent', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      // /proc on Linux and a non-existent root path on macOS both produce a
+      // permission/ENOENT error from mkdir. The log must not throw.
+      const log = fileAuditLog({
+        path: '/dev/null/snapfeed-readonly/nested/audit.jsonl',
+      })
+      await expect(log.record(sampleDispatched)).resolves.toBeUndefined()
+      expect(errSpy).toHaveBeenCalled()
+    } finally {
+      errSpy.mockRestore()
+    }
+  })
+})
+
 describe('multiAuditLog', () => {
   it('forwards every event to all sub-logs in parallel', async () => {
     const a: AuditLog = { record: vi.fn(async () => undefined) }

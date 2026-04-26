@@ -11,18 +11,19 @@ your own backend — Vite is purely a client bundler and has no runtime.
 
 ## Quickstart
 
-1. **Copy env template** — `cp .env.example .env`, then uncomment one
+1. **Build the local snapfeed package** — from the snapfeed repo root, run
+   `npm install && npm run build` (the example imports from `dist/`).
+2. **Copy env template** — `cp .env.example .env`, then uncomment one
    `SNAPFEED_*` variable (e.g. `SNAPFEED_FILE_PATH=feedback.jsonl` for a
    no-setup demo).
-2. **Install** — `npm install` (also resolves the local `snapfeed`
-   package via `file:../..`; make sure you've run `npm run build` once
-   inside the parent `snapfeed/` directory).
-3. **Run dev** — `npm run dev`. This boots Vite on
+3. **Install** — `npm install` (resolves the local `snapfeed` package via
+   `file:../..`).
+4. **Run dev** — `npm run dev`. This boots Vite on
    <http://localhost:5173> and the Express backend on
    <http://localhost:8788> in parallel.
-4. **Open** <http://localhost:5173> and press
+5. **Open** <http://localhost:5173> and press
    **Ctrl+Shift+F** (or **Cmd+Shift+F** on Mac).
-5. **Submit** — type something, send. Check your destination (or the
+6. **Submit** — type something, send. Check your destination (or the
    dev server stdout if you set `SNAPFEED_FILE_PATH`).
 
 ## Architecture

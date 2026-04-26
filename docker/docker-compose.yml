@@ -22,8 +22,6 @@
 #     reproducible-build guidance.
 # ─────────────────────────────────────────────────────────────────────────────
 
-version: '3.9'
-
 services:
   worker:
     build:
@@ -41,9 +39,18 @@ services:
       SNAPFEED_AUDIT_LOG_PATH: ${SNAPFEED_AUDIT_LOG_PATH:-/data/audit/snapfeed.jsonl}
       SNAPFEED_UPLOAD_DIR: ${SNAPFEED_UPLOAD_DIR:-/data/uploads}
       WORKER_PORT: "8787"
+      # Set to "true" only when an upstream proxy/ingress sets X-Forwarded-For
+      # AND you trust it (otherwise rate-limit-per-IP is spoofable).
+      SNAPFEED_TRUST_PROXY: ${SNAPFEED_TRUST_PROXY:-false}
     volumes:
       - ./data/audit:/data/audit
       - ./data/uploads:/data/uploads
+    # Bound the worker so a runaway request loop or memory leak can't take
+    # the host down. 512m is generous for a JSON-shuffling Node process; if
+    # you ship larger payloads, raise SNAPFEED_MAX_BODY_BYTES first and only
+    # bump mem_limit if you actually see OOMs.
+    mem_limit: 512m
+    pids_limit: 256
     depends_on:
       minio:
         condition: service_healthy
@@ -79,5 +86,15 @@ services:
       - "11434:11434"
     volumes:
       - ./data/ollama:/root/.ollama
+    # 7B-class models (llama3:8b, mistral:7b) need ~6 GB RAM at runtime;
+    # 8 GB gives headroom. Drop to 4g for smaller models like phi3:mini.
+    mem_limit: 8g
+    healthcheck:
+      # Ollama bundles wget on its Ubuntu base; curl is not always present.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:11434/api/version || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     profiles:
       - llm

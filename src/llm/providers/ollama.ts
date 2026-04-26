@@ -2,8 +2,20 @@
  * snapfeed — Ollama (local) provider
  *
  * Server-side only. Ollama runs on the same machine (or in-tenant), so no
- * API key is needed. Uses Ollama's `/api/generate` endpoint with the
- * `prompt` field (not `messages` — Ollama's chat endpoint is separate).
+ * API key is needed.
+ *
+ * Uses Ollama's `/api/chat` endpoint with a role-tagged `messages` array.
+ * The previous implementation called `/api/generate` with a concatenated
+ * `prompt: system + '\n\n' + user`, which works for raw base models but
+ * skips the model's chat template — most chat-tuned Ollama models
+ * (llama3, qwen, mistral-instruct, gemma, phi3, etc.) expect the
+ * Modelfile-defined template wrapping each turn. Switching to `/api/chat`
+ * lets Ollama apply the right template per-model with no per-model logic
+ * in snapfeed.
+ *
+ * Custom endpoints (`config.endpoint`) are consumer-trusted: snapfeed
+ * validates the scheme (http/https only, throws otherwise) but does NOT
+ * validate the host. See `providers/endpoint.ts` for details.
  *
  * `stream: false` keeps the response single-shot. We deliberately do NOT
  * support streaming here — the runner aggregates short, non-streamed
@@ -15,13 +27,16 @@
  */
 
 import type { LLMConfig, LLMProvider } from '../types'
+import { validateEndpoint } from './endpoint'
 
-const DEFAULT_ENDPOINT = 'http://localhost:11434/api/generate'
+const DEFAULT_ENDPOINT = 'http://localhost:11434/api/chat'
 const DEFAULT_MODEL = 'llama3'
 
 export function ollamaProvider(config: LLMConfig): LLMProvider {
   const endpoint = config.endpoint ?? DEFAULT_ENDPOINT
   const model = config.model ?? DEFAULT_MODEL
+
+  if (config.endpoint) validateEndpoint(endpoint, 'ollama')
 
   return {
     name: 'ollama',
@@ -33,7 +48,10 @@ export function ollamaProvider(config: LLMConfig): LLMProvider {
 
       const body = {
         model,
-        prompt: `${system}\n\n${user}`,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
         stream: false,
       }
 
@@ -51,8 +69,8 @@ export function ollamaProvider(config: LLMConfig): LLMProvider {
         )
       }
 
-      const json = (await res.json()) as OllamaResponse
-      const text = json?.response ?? ''
+      const json = (await res.json()) as OllamaChatResponse
+      const text = json?.message?.content ?? ''
       const tokensUsed =
         (json?.eval_count ?? 0) + (json?.prompt_eval_count ?? 0)
 
@@ -61,8 +79,8 @@ export function ollamaProvider(config: LLMConfig): LLMProvider {
   }
 }
 
-interface OllamaResponse {
-  response?: string
+interface OllamaChatResponse {
+  message?: { role?: string; content?: string }
   eval_count?: number
   prompt_eval_count?: number
 }

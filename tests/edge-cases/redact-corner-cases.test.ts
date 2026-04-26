@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { redactForLLM } from '../../src/llm/redact'
-import { validatePayload } from '../../src/server/security'
+import { sanitizeConsoleError, validatePayload } from '../../src/server/security'
 
 // ─── helper: run server-side sanitizer through validatePayload ──────────────
 
@@ -247,4 +247,81 @@ describe('server sanitizeConsoleError (via validatePayload)', () => {
     const out = sanitizeViaServer('user alice@example.com hit /api/foo')
     expect(out).toContain('alice@example.com')
   })
+})
+
+// ─── tightened-regex regressions ────────────────────────────────────────────
+
+describe('server sanitizeConsoleError — tightened SECRET_PATTERNS (no false positives)', () => {
+  it('does NOT redact "monkey patched" (was a false positive on `key`)', () => {
+    const out = sanitizeViaServer('window.fetch was monkey patched by analytics')
+    expect(out).toBe('window.fetch was monkey patched by analytics')
+    expect(out).not.toContain('[REDACTED]')
+  })
+
+  it('does NOT redact "donkey kong"', () => {
+    const out = sanitizeViaServer('error in donkey kong loader')
+    expect(out).toBe('error in donkey kong loader')
+  })
+
+  it('does NOT redact "tokenize" (longer word containing "token")', () => {
+    const out = sanitizeViaServer('failed to tokenize input string')
+    expect(out).toBe('failed to tokenize input string')
+  })
+
+  it('does NOT redact "passwordless" (longer word containing "password")', () => {
+    const out = sanitizeViaServer('passwordless login flow not yet implemented')
+    expect(out).toBe('passwordless login flow not yet implemented')
+  })
+
+  it('still redacts a real `token=...` in the same line as a benign substring', () => {
+    const out = sanitizeViaServer(
+      'tokenize failed: token=abc123 returned by upstream'
+    )
+    expect(out).toContain('[REDACTED]')
+    expect(out).not.toContain('abc123')
+    // tokenize stays — it's outside the matched span
+    expect(out).toContain('tokenize')
+  })
+})
+
+// ─── SECRET_PATTERNS sync between security.ts and llm/redact.ts ────────────
+//
+// `redact.ts` deliberately re-implements the SECRET_PATTERNS list from
+// `security.ts` so the LLM module can be bundled / audited independently.
+// The duplication is intentional but FRAGILE — a future patch might tighten
+// one without the other. This pin asserts both redact the same canonical
+// inputs, so a divergence breaks CI loudly.
+//
+// Note: redactForLLM does MORE than sanitizeConsoleError (emails, CC,
+// HIGH_ENTROPY). We only assert the SECRET_PATTERNS subset here.
+
+describe('SECRET_PATTERNS sync between server/security.ts and llm/redact.ts', () => {
+  const cases: Array<{ input: string; mustContainSecret: string }> = [
+    { input: 'failure: token=mySecret123', mustContainSecret: 'mySecret123' },
+    { input: 'config key=ABCxyz789', mustContainSecret: 'ABCxyz789' },
+    { input: 'env secret=supersecretvalue', mustContainSecret: 'supersecretvalue' },
+    { input: 'cred password=hunter2', mustContainSecret: 'hunter2' },
+    { input: 'auth: bearer abcdef-token', mustContainSecret: 'abcdef-token' },
+    { input: 'header authorization: AbCdEfG', mustContainSecret: 'AbCdEfG' },
+    {
+      input:
+        'jwt eyJhbGciOiJIUzI1NiJ9.payload-segment.signature-segment passed',
+      mustContainSecret: 'eyJhbGciOiJIUzI1NiJ9.payload-segment.signature-segment',
+    },
+  ]
+
+  for (const { input, mustContainSecret } of cases) {
+    it(`both redactors strip "${mustContainSecret}" in: ${input.slice(0, 50)}…`, () => {
+      const llm = redactForLLM(input)
+      const server = sanitizeConsoleError(input)
+      expect(llm, `redactForLLM left secret: ${llm}`).not.toContain(
+        mustContainSecret
+      )
+      expect(server, `sanitizeConsoleError left secret: ${server}`).not.toContain(
+        mustContainSecret
+      )
+      expect(llm).toContain('[REDACTED]')
+      expect(server).toContain('[REDACTED]')
+    })
+  }
 })

@@ -182,7 +182,9 @@ export function asanaAdapter(options: AsanaAdapterOptions): FeedbackAdapter {
           }
         }
 
-        const created = (await createRes.json()) as {
+        // Guard against malformed 2xx bodies — fall through to the missing-gid
+        // check below rather than crashing the adapter on a JSON parse error.
+        const created = (await createRes.json().catch(() => ({}))) as {
           data?: { gid?: string }
         }
         const taskGid = created.data?.gid

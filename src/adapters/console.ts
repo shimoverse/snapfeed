@@ -22,11 +22,18 @@ export function consoleAdapter(options: ConsoleAdapterOptions = {}): FeedbackAda
     name: 'console',
     async send(payload: FeedbackPayload): Promise<FeedbackAdapterResult> {
       const fn = console[level] ?? console.log
-      fn(
-        '[devtools/feedback]',
-        pretty ? JSON.stringify(payload, null, 2) : payload
-      )
-      return { ok: true }
+      // Wrapped so a consumer who monkey-patches console.log to throw cannot
+      // crash the adapter pipeline.
+      try {
+        fn(
+          '[devtools/feedback]',
+          pretty ? JSON.stringify(payload, null, 2) : payload
+        )
+        return { ok: true }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return { ok: false, error: `Console adapter error: ${message}` }
+      }
     },
   }
 }

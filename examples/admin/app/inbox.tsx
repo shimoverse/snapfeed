@@ -141,15 +141,26 @@ export function Inbox({ records, campaigns, filters, filePath }: InboxProps) {
             ? { resolvedAt: now }
             : {}
       const local: Record<string, Partial<AdminFeedbackRecord>> = {}
+      const failures: Array<{ id: string; status: number; reason?: string }> = []
       await Promise.all(
         ids.map(async id => {
-          const res = await fetch(`/api/admin/feedback/${encodeURIComponent(id)}`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ status, ...triageFields }),
-          })
-          if (res.ok) {
-            local[id] = { status, ...triageFields }
+          try {
+            const res = await fetch(`/api/admin/feedback/${encodeURIComponent(id)}`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ status, ...triageFields }),
+            })
+            if (res.ok) {
+              local[id] = { status, ...triageFields }
+            } else {
+              failures.push({ id, status: res.status })
+            }
+          } catch (err) {
+            failures.push({
+              id,
+              status: 0,
+              reason: err instanceof Error ? err.message : String(err),
+            })
           }
         }),
       )
@@ -157,6 +168,22 @@ export function Inbox({ records, campaigns, filters, filePath }: InboxProps) {
       clearSelection()
       // Soft refresh: pull the latest server view (which includes our writes).
       startTransition(() => router.refresh())
+
+      // Surface bulk failures so the operator notices them. Toast / inline
+      // banner can land in v0.6 — for v0.5 a console.error + alert is enough
+      // to break the silent-failure footgun.
+      if (failures.length > 0) {
+        console.error(
+          `[snapfeed-admin] bulk ${status}: ${failures.length}/${ids.length} record(s) failed`,
+          failures,
+        )
+        if (typeof window !== 'undefined') {
+          window.alert(
+            `Bulk ${status} partially failed: ${failures.length} of ${ids.length} records ` +
+              `couldn't be updated. See the browser console for details.`,
+          )
+        }
+      }
     } finally {
       setBusy(false)
     }

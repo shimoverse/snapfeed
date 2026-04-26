@@ -133,17 +133,15 @@ describe('cacheRoutingSource', () => {
     vi.useFakeTimers()
     const fetchSpy = vi.fn(async () => sampleConfig)
     const source = makeSource(fetchSpy)
-    const clearSpy = vi.spyOn(global, 'clearInterval')
 
     const cached = cacheRoutingSource({ source, pollMs: 1000 })
+    // Let the initial tick land + the first schedule() be queued.
+    await vi.advanceTimersByTimeAsync(0)
     cached.stop()
-    expect(clearSpy).toHaveBeenCalled()
 
     const callsBefore = fetchSpy.mock.calls.length
     // Advance well past several intervals; no further fetch should fire.
-    vi.advanceTimersByTime(10_000)
-    // Yield a microtask so any in-flight promises settle.
-    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(10_000)
     expect(fetchSpy.mock.calls.length).toBe(callsBefore)
   })
 
@@ -161,6 +159,129 @@ describe('cacheRoutingSource', () => {
     // Trigger a poll cycle.
     await vi.advanceTimersByTimeAsync(1000)
     expect(fetchSpy.mock.calls.length).toBeGreaterThan(initialCalls)
+
+    cached.stop()
+  })
+})
+
+// ─── Exponential backoff on consecutive failures ────────────────────────────
+
+describe('cacheRoutingSource — exponential backoff', () => {
+  it('keeps polling at pollMs while failures stay at the threshold (3)', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    const fetchSpy = vi.fn(async () => {
+      calls += 1
+      // Calls 1, 2, 3 fail; call 4 succeeds. Through call 3 we're AT the
+      // threshold but haven't crossed it, so the interval stays at pollMs.
+      if (calls <= 3) return undefined
+      return sampleConfig
+    })
+    const source = makeSource(fetchSpy)
+    const cached = cacheRoutingSource({ source, pollMs: 1000 })
+
+    // Initial tick → call 1 (fail #1).
+    await vi.advanceTimersByTimeAsync(0)
+    expect(calls).toBe(1)
+
+    // Tick at pollMs → call 2 (fail #2).
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toBe(2)
+
+    // Tick at pollMs → call 3 (fail #3, AT threshold). Next interval still pollMs.
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toBe(3)
+
+    // Tick at pollMs → call 4 (success), resets counter.
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(calls).toBe(4)
+
+    cached.stop()
+  })
+
+  it('doubles the interval after the 4th consecutive failure (capped at maxPollMs)', async () => {
+    vi.useFakeTimers()
+    const fetchSpy = vi.fn(async () => undefined) // always fails
+    const source = makeSource(fetchSpy)
+    const cached = cacheRoutingSource({
+      source,
+      pollMs: 1000,
+      maxPollMs: 8000,
+    })
+
+    // Initial tick (fail #1).
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+
+    // Calls 2, 3, 4 fire at pollMs each (still no backoff during/at threshold).
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchSpy).toHaveBeenCalledTimes(4) // fail #4 → next interval doubles to 2000
+
+    // 1000ms is no longer enough — wait should be 2000ms.
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchSpy).toHaveBeenCalledTimes(5) // fail #5 → next 4000
+
+    // 4000ms wait now.
+    await vi.advanceTimersByTimeAsync(3999)
+    expect(fetchSpy).toHaveBeenCalledTimes(5)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(6) // fail #6 → next 8000 (cap)
+
+    // 8000ms cap.
+    await vi.advanceTimersByTimeAsync(7999)
+    expect(fetchSpy).toHaveBeenCalledTimes(6)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(7)
+
+    // Already capped — another full 8000ms → call 8.
+    await vi.advanceTimersByTimeAsync(8000)
+    expect(fetchSpy).toHaveBeenCalledTimes(8)
+
+    cached.stop()
+  })
+
+  it('resets backoff back to pollMs on first success', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    const fetchSpy = vi.fn(async () => {
+      calls += 1
+      // Calls 1..5 fail, call 6 succeeds, then keep failing.
+      if (calls === 6) return sampleConfig
+      return undefined
+    })
+    const source = makeSource(fetchSpy)
+    const cached = cacheRoutingSource({
+      source,
+      pollMs: 1000,
+      maxPollMs: 8000,
+    })
+
+    // Drive failures 1..4 to cross the threshold.
+    await vi.advanceTimersByTimeAsync(0)        // call 1, fail
+    await vi.advanceTimersByTimeAsync(1000)     // call 2, fail
+    await vi.advanceTimersByTimeAsync(1000)     // call 3, fail (== threshold)
+    await vi.advanceTimersByTimeAsync(1000)     // call 4, fail (> threshold → next 2000)
+    expect(calls).toBe(4)
+
+    // Now interval is 2000ms.
+    await vi.advanceTimersByTimeAsync(2000)     // call 5, fail (next 4000)
+    expect(calls).toBe(5)
+
+    // Call 6 fires after 4000ms and succeeds.
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(calls).toBe(6)
+
+    // After success the next interval should be pollMs (1000) again.
+    await vi.advanceTimersByTimeAsync(999)
+    expect(calls).toBe(6)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(calls).toBe(7)                       // back at pollMs cadence
 
     cached.stop()
   })

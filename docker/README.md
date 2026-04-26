@@ -38,7 +38,7 @@ docker compose -f docker/docker-compose.yml up
 
 # 4. Verify it's healthy (in another terminal)
 curl http://localhost:8787/healthz
-# → { "ok": true, "version": "0.5.0", "adapters": [...], ... }
+# → { "ok": true, "version": "<x.y.z>", "adapters": [...], ... }
 
 # 5. POST a sample feedback payload
 curl -X POST http://localhost:8787/feedback \
@@ -120,6 +120,10 @@ To pull a model the first time:
 docker exec -it snapfeed-ollama ollama pull llama3
 ```
 
+Note: `llama3:8b` is ~4 GB and takes several minutes to download on a typical
+home connection — grab a coffee. Smaller models (`phi3:mini`, ~2 GB) finish
+faster if you're just kicking the tires.
+
 No prompts or completions ever leave the host. Per `SECURITY.md`, the only
 field the audit log records about LLM calls is `tokensUsed` — never content.
 
@@ -183,6 +187,27 @@ restart the worker.
   registry and pre-load the model weights into `docker/data/ollama/`.
 
 ---
+
+## Production hardening
+
+A few things worth doing before you put the worker behind real traffic:
+
+- **Resource limits are set in `docker-compose.yml`** — the worker is capped
+  at `mem_limit: 512m` / `pids_limit: 256`, ollama at `mem_limit: 8g`.
+  Tune to your hardware.
+- **Rotate the JSONL audit log.** It grows unbounded — wire `logrotate`
+  (or your platform's equivalent) onto `docker/data/audit/snapfeed.jsonl`.
+  A weekly rotation with `copytruncate` is fine; the worker re-opens the
+  file via the `fileAuditLog` adapter on every write.
+- **Pin image digests** for reproducibility. v0.5 uses tags
+  (`node:20-alpine`, `minio/minio:RELEASE.…`, `ollama/ollama:latest`).
+  v0.6 will publish digest pins; until then, snapshot the resolved digests
+  with `docker compose pull && docker images --digests`.
+- **Set `SNAPFEED_TRUST_PROXY=true`** only when an upstream proxy/ingress
+  controls the `X-Forwarded-For` header. Default false — otherwise
+  rate-limit-per-IP is bypassable.
+- **Set `ALLOWED_ORIGINS`** in production. With `NODE_ENV=production` and
+  no allowlist, the worker fails closed and rejects every origin.
 
 ## What's NOT in v0.5
 

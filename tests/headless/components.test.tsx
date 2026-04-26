@@ -10,6 +10,9 @@
  *
  * The hook-level coverage in useFeedbackWidget.test.tsx exercises the
  * core state machine; these tests cover render contract + slot swap.
+ *
+ * v0.5.2 added accessibility + focus-trap behavior to FeedbackModal and
+ * FeedbackTextarea; the new it.todo entries below cover those for v0.6.
  */
 
 import { describe, it } from 'vitest'
@@ -73,6 +76,65 @@ describe('FeedbackModal', () => {
     //   fireEvent.keyDown(document, { key: 'Escape' })
     //   expect(onClose).toHaveBeenCalledTimes(1)
   )
+
+  // ── v0.5.2 accessibility additions ────────────────────────────────────
+  // These assert the inline focus-trap / focus-return / ARIA wiring added
+  // when we landed the pre-publish hardening pass. None require new deps
+  // beyond the (deferred) jsdom + @testing-library/react.
+
+  it.todo(
+    'sets role="dialog" and aria-modal="true" on the panel'
+    //   open the modal, then:
+    //   const panel = screen.getByRole('dialog')
+    //   expect(panel.getAttribute('aria-modal')).toBe('true')
+  )
+
+  it.todo(
+    'wires aria-labelledby to a stable useId() heading id'
+    //   const panel = screen.getByRole('dialog')
+    //   const labelId = panel.getAttribute('aria-labelledby')
+    //   expect(labelId).toBeTruthy()
+    //   expect(document.getElementById(labelId!)).not.toBeNull()
+  )
+
+  it.todo(
+    'traps Tab focus inside the modal — Tab from last focusable wraps to first'
+    //   open modal with several focusable children
+    //   const focusables = within(panel).getAllByRole('button')
+    //   focusables[focusables.length - 1].focus()
+    //   fireEvent.keyDown(document, { key: 'Tab' })
+    //   expect(document.activeElement).toBe(focusables[0])
+  )
+
+  it.todo(
+    'Shift+Tab from first focusable wraps to last'
+    //   focusables[0].focus()
+    //   fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    //   expect(document.activeElement).toBe(focusables[focusables.length - 1])
+  )
+
+  it.todo(
+    'restores focus to the previously-focused element on close'
+    //   const opener = document.createElement('button')
+    //   document.body.appendChild(opener)
+    //   opener.focus()
+    //   <open the modal, then close it via ESC>
+    //   await waitFor(() => expect(document.activeElement).toBe(opener))
+  )
+
+  it.todo(
+    'ignores backdrop click while state === "submitting"'
+    //   <kick off a slow submit so state is "submitting">
+    //   fireEvent.click(getByTestId('overlay'))
+    //   <modal must still be visible — onClose was not called>
+  )
+
+  it.todo(
+    'ignores ESC while state === "submitting"'
+    //   <as above; then>
+    //   fireEvent.keyDown(document, { key: 'Escape' })
+    //   <modal must still be visible — onClose was not called>
+  )
 })
 
 describe('FeedbackTextarea', () => {
@@ -82,6 +144,30 @@ describe('FeedbackTextarea', () => {
     //   const ta = screen.getByPlaceholderText('hi') as HTMLTextAreaElement
     //   fireEvent.change(ta, { target: { value: 'typing' } })
     //   expect(ta.value).toBe('typing')
+  )
+
+  // ── v0.5.2 accessibility additions ────────────────────────────────────
+
+  it.todo(
+    'renders a visually-hidden <label> with default text "Feedback"'
+    //   const ta = screen.getByLabelText('Feedback') as HTMLTextAreaElement
+    //   expect(ta.tagName).toBe('TEXTAREA')
+    //   const label = document.querySelector(`label[for="${ta.id}"]`)!
+    //   const cs = getComputedStyle(label)
+    //   expect(cs.position).toBe('absolute')
+    //   expect(cs.width).toBe('1px')
+  )
+
+  it.todo(
+    'uses the provided label prop instead of the default'
+    //   render(<FeedbackTextarea label="Bug description" />)
+    //   expect(screen.getByLabelText('Bug description')).toBeInTheDocument()
+  )
+
+  it.todo(
+    'omits the <label> entirely when label={null}'
+    //   render(<FeedbackTextarea label={null} />)
+    //   expect(screen.queryByText('Feedback')).toBeNull()
   )
 })
 
@@ -99,5 +185,22 @@ describe('FeedbackComponentsProvider', () => {
     //     </FeedbackProvider>
     //   )
     //   expect(screen.getByText('Open').dataset.custom).toBe('')
+  )
+})
+
+describe('FeedbackProvider — context value memoization (v0.5.2)', () => {
+  it.todo(
+    'does not re-call useFeedbackContext consumers when the provider re-renders with the same props'
+    //   const renderSpy = vi.fn()
+    //   function Spy() { useFeedbackContext(); renderSpy(); return null }
+    //   const { rerender } = render(
+    //     <FeedbackProvider appName="x"><Spy /></FeedbackProvider>
+    //   )
+    //   const baseline = renderSpy.mock.calls.length
+    //   rerender(<FeedbackProvider appName="x"><Spy /></FeedbackProvider>)
+    //   // With memoization, the context value identity is stable, so the
+    //   // memoized Spy doesn't re-render. Without it, every parent render
+    //   // forces all consumers through React.memo.
+    //   expect(renderSpy.mock.calls.length).toBe(baseline)
   )
 })

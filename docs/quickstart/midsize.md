@@ -3,7 +3,7 @@
 **Persona:** Engineering manager or tech lead at a 50–500 person company. Stack: JIRA Cloud + Slack. IT reviews new tools but you don't have full corp lockdown. Probably running on AWS/GCP/Azure, behind your usual ingress.
 **Goal:** Self-hosted Docker stack inside your VPC. Every piece of feedback creates a JIRA issue (with screenshot, build SHA, reporter), posts to a Slack channel for awareness, and writes one line per dispatch to an append-only audit log.
 **Time budget:** 1 hour, including JIRA token provisioning and a smoke test.
-**snapfeed version:** v0.4.0
+**snapfeed version:** v0.5.x
 
 ---
 

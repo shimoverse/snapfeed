@@ -20,8 +20,9 @@ COPY tsconfig.json tsup.config.ts ./
 COPY src ./src
 RUN npm run build
 
-# Re-install with production deps only, into a clean prefix we can copy from.
-RUN rm -rf node_modules && npm ci --omit=dev
+# Prune dev deps in place — much faster than a fresh `npm ci --omit=dev`,
+# which would re-download every prod dep we already have on disk.
+RUN npm prune --omit=dev
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runtime

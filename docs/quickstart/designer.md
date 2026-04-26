@@ -3,7 +3,7 @@
 **Persona:** Designer, PM, QA, or anyone giving feedback during dogfooding. You're a *consumer* of the widget, not the person who installed it.
 **Goal:** Know how to file useful feedback in 30 seconds without learning a ticketing tool.
 **Time budget:** 2 minutes to read this. The widget itself is built to take seconds per piece of feedback.
-**snapfeed version:** v0.4.0
+**snapfeed version:** v0.5.x
 
 ---
 

@@ -72,7 +72,7 @@ describe('validatePayload', () => {
     expect(result.error).toMatch(/text is required/i)
   })
 
-  it('rejects oversized text (> 64,000 chars)', () => {
+  it('rejects oversized text (> 64,000 UTF-8 bytes)', () => {
     const result = validatePayload({ text: 'a'.repeat(64_001) }, baseConfig)
     expect(result.valid).toBe(false)
     expect(result.error).toMatch(/too long/i)

@@ -106,11 +106,17 @@ export function installNetworkCapture(
   }
 
   // ─── fetch ──────────────────────────────────────────────────────────────
+  // Cooperation with other instrumentation: we wrap the *current* `window.fetch`
+  // and only restore it on uninstall if it's still our wrapper. If a downstream
+  // library has installed its own wrapper on top of ours, we leave the chain
+  // alone — clobbering it would silently break analytics, observability tools,
+  // mock-fetch helpers, etc. that wrapped after we did.
   const originalFetch = window.fetch
   const boundFetch = originalFetch ? originalFetch.bind(window) : undefined
+  let wrappedFetch: typeof window.fetch | undefined
 
   if (originalFetch && boundFetch) {
-    const wrappedFetch: typeof window.fetch = async (input, init) => {
+    wrappedFetch = async (input, init) => {
       const method =
         (init?.method ?? (typeof input !== 'string' && 'method' in (input as Request)
           ? (input as Request).method
@@ -178,8 +184,13 @@ export function installNetworkCapture(
   }
   const STATE_KEY = '__snapfeedNetCapState__'
 
+  // Same cooperation pattern as for fetch — only restore on uninstall if our
+  // wrappers are still the live methods, otherwise leave the chain alone.
+  let wrappedOpen: typeof XHR.prototype.open | undefined
+  let wrappedSend: typeof XHR.prototype.send | undefined
+
   if (XHR && originalOpen && originalSend) {
-    XHR.prototype.open = function patchedOpen(
+    wrappedOpen = function patchedOpen(
       this: XMLHttpRequest,
       method: string,
       url: string | URL,
@@ -201,7 +212,7 @@ export function installNetworkCapture(
       ) => void).call(this, method, url as string, ...rest)
     } as typeof XHR.prototype.open
 
-    XHR.prototype.send = function patchedSend(
+    wrappedSend = function patchedSend(
       this: XMLHttpRequest,
       body?: Document | XMLHttpRequestBodyInit | null
     ) {
@@ -231,15 +242,28 @@ export function installNetworkCapture(
         body?: Document | XMLHttpRequestBodyInit | null
       ) => void).call(this, body ?? null)
     } as typeof XHR.prototype.send
+
+    XHR.prototype.open = wrappedOpen
+    XHR.prototype.send = wrappedSend
   }
 
   // ─── Handle ─────────────────────────────────────────────────────────────
   return {
     getRecent: () => buffer.slice(),
     uninstall: () => {
-      if (originalFetch) window.fetch = originalFetch
-      if (XHR && originalOpen) XHR.prototype.open = originalOpen
-      if (XHR && originalSend) XHR.prototype.send = originalSend
+      // Cooperative uninstall: only restore the original if our wrapper is
+      // still the live method. If a downstream library has wrapped on top of
+      // ours (common with analytics/observability tools that compose), we
+      // leave their chain intact rather than clobbering it.
+      if (originalFetch && wrappedFetch && window.fetch === wrappedFetch) {
+        window.fetch = originalFetch
+      }
+      if (XHR && originalOpen && wrappedOpen && XHR.prototype.open === wrappedOpen) {
+        XHR.prototype.open = originalOpen
+      }
+      if (XHR && originalSend && wrappedSend && XHR.prototype.send === wrappedSend) {
+        XHR.prototype.send = originalSend
+      }
     },
   }
 }

@@ -75,12 +75,14 @@ export function supabaseAdapter(options: SupabaseAdapterOptions): FeedbackAdapte
   }
 
   const insertUrl = `${url.replace(/\/$/, '')}/rest/v1/${table}`
-  const headers = {
+  // Frozen so caller mutation can't accidentally drop the apikey/Authorization
+  // header between requests. Defensive immutability is cheap.
+  const headers = Object.freeze({
     'Content-Type': 'application/json',
     'apikey': key,
     'Authorization': `Bearer ${key}`,
     'Prefer': 'return=representation',
-  }
+  })
 
   return {
     name: 'supabase',
@@ -123,7 +125,9 @@ export function supabaseAdapter(options: SupabaseAdapterOptions): FeedbackAdapte
           }
         }
 
-        const data = (await res.json()) as Array<{ id?: string }>
+        // Guard against malformed 2xx bodies — drop deliveryId rather than
+        // crashing the adapter on a JSON parse error.
+        const data = (await res.json().catch(() => [])) as Array<{ id?: string }>
         const insertedId = data?.[0]?.id
 
         return { ok: true, deliveryId: insertedId }

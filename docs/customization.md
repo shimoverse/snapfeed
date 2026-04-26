@@ -1,5 +1,7 @@
 # Customization
 
+> Theme tokens import from `snapfeed/theme` (subpath form). The same exports are also re-exported from the main `snapfeed` barrel for convenience.
+
 snapfeed ships with a polished default widget — drop in `<FeedbackProvider>` and you have a working feedback flow. But every product has its own design language, and the widget should look like *yours*, not ours.
 
 This guide walks through four levels of customization, ordered from "5-minute rebrand" to "render anything you want."
@@ -34,7 +36,7 @@ The default widget reads its colors and spacing from CSS custom properties under
 Or generate the rule from a `SnapfeedTheme` object using the `themeToCss` helper:
 
 ```ts
-import { extendTheme, lightTheme, themeToCss } from 'snapfeed'
+import { extendTheme, lightTheme, themeToCss } from 'snapfeed/theme'
 
 const myTheme = extendTheme(lightTheme, {
   colors: { accent: '#6366F1' },
@@ -332,7 +334,7 @@ const isDark = useMyDarkMode()
 If you're using Level 1 theming, you can also publish two scopes and let CSS pick:
 
 ```ts
-import { lightTheme, darkTheme, themeToCss } from 'snapfeed'
+import { lightTheme, darkTheme, themeToCss } from 'snapfeed/theme'
 
 const css = `
   ${themeToCss(lightTheme)}

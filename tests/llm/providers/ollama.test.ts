@@ -2,8 +2,9 @@
  * Tests for src/llm/providers/ollama.ts
  *
  * fetch is mocked. Ollama is local — no auth header. Body uses the
- * `prompt` field with `stream: false`. Tokens come back as
- * eval_count + prompt_eval_count.
+ * `/api/chat` endpoint with a `messages` array (so each model's chat
+ * template is applied) and `stream: false`. Response text comes back as
+ * `message.content`; tokens as `eval_count + prompt_eval_count`.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -36,14 +37,18 @@ afterEach(() => {
 })
 
 describe('ollamaProvider', () => {
-  it('POSTs to the default localhost endpoint with no auth header', async () => {
-    mockOk({ response: 'hi', eval_count: 4, prompt_eval_count: 6 })
+  it('POSTs to the default localhost /api/chat endpoint with no auth header', async () => {
+    mockOk({
+      message: { role: 'assistant', content: 'hi' },
+      eval_count: 4,
+      prompt_eval_count: 6,
+    })
     const provider = ollamaProvider(baseConfig)
     await provider.complete({ system: 's', user: 'u' })
 
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('http://localhost:11434/api/generate')
+    expect(url).toBe('http://localhost:11434/api/chat')
     expect(init.method).toBe('POST')
     const headers = init.headers as Record<string, string>
     expect(headers['authorization']).toBeUndefined()
@@ -52,7 +57,11 @@ describe('ollamaProvider', () => {
   })
 
   it('sets stream: false in the request body', async () => {
-    mockOk({ response: 'ok', eval_count: 1, prompt_eval_count: 1 })
+    mockOk({
+      message: { role: 'assistant', content: 'ok' },
+      eval_count: 1,
+      prompt_eval_count: 1,
+    })
     const provider = ollamaProvider(baseConfig)
     await provider.complete({ system: 's', user: 'u' })
 
@@ -62,19 +71,31 @@ describe('ollamaProvider', () => {
     expect(body.stream).toBe(false)
   })
 
-  it('combines system + user into the prompt field', async () => {
-    mockOk({ response: 'ok', eval_count: 1, prompt_eval_count: 1 })
+  it('sends system + user as a role-tagged messages array (not a flat prompt)', async () => {
+    mockOk({
+      message: { role: 'assistant', content: 'ok' },
+      eval_count: 1,
+      prompt_eval_count: 1,
+    })
     const provider = ollamaProvider(baseConfig)
     await provider.complete({ system: 'be brief', user: 'hi there' })
 
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const [, init] = fetchMock.mock.calls[0]
     const body = JSON.parse(init.body as string)
-    expect(body.prompt).toBe('be brief\n\nhi there')
+    expect(body.prompt).toBeUndefined()
+    expect(body.messages).toEqual([
+      { role: 'system', content: 'be brief' },
+      { role: 'user', content: 'hi there' },
+    ])
   })
 
   it('uses the default model when none specified', async () => {
-    mockOk({ response: 'ok', eval_count: 1, prompt_eval_count: 1 })
+    mockOk({
+      message: { role: 'assistant', content: 'ok' },
+      eval_count: 1,
+      prompt_eval_count: 1,
+    })
     const provider = ollamaProvider(baseConfig)
     await provider.complete({ system: 's', user: 'u' })
 
@@ -84,30 +105,42 @@ describe('ollamaProvider', () => {
     expect(body.model).toBe('llama3')
   })
 
-  it('parses the `response` field as text', async () => {
-    mockOk({ response: 'the answer', eval_count: 5, prompt_eval_count: 5 })
+  it('parses message.content as text', async () => {
+    mockOk({
+      message: { role: 'assistant', content: 'the answer' },
+      eval_count: 5,
+      prompt_eval_count: 5,
+    })
     const provider = ollamaProvider(baseConfig)
     const out = await provider.complete({ system: 's', user: 'u' })
     expect(out.text).toBe('the answer')
   })
 
   it('reports tokensUsed = eval_count + prompt_eval_count', async () => {
-    mockOk({ response: 'x', eval_count: 17, prompt_eval_count: 23 })
+    mockOk({
+      message: { role: 'assistant', content: 'x' },
+      eval_count: 17,
+      prompt_eval_count: 23,
+    })
     const provider = ollamaProvider(baseConfig)
     const out = await provider.complete({ system: 's', user: 'u' })
     expect(out.tokensUsed).toBe(40)
   })
 
   it('respects a custom endpoint (e.g. remote Ollama in tenant)', async () => {
-    mockOk({ response: 'ok', eval_count: 1, prompt_eval_count: 1 })
+    mockOk({
+      message: { role: 'assistant', content: 'ok' },
+      eval_count: 1,
+      prompt_eval_count: 1,
+    })
     const provider = ollamaProvider({
       ...baseConfig,
-      endpoint: 'http://ollama.internal:11434/api/generate',
+      endpoint: 'http://ollama.internal:11434/api/chat',
     })
     await provider.complete({ system: 's', user: 'u' })
 
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const [url] = fetchMock.mock.calls[0]
-    expect(url).toBe('http://ollama.internal:11434/api/generate')
+    expect(url).toBe('http://ollama.internal:11434/api/chat')
   })
 })

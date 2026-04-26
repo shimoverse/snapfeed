@@ -58,7 +58,21 @@ type ExpressMiddleware = (req: Request, res: Response, next: NextFn) => void | P
  * with built-in rate limiting, payload validation, and origin checking.
  */
 export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddleware {
+  // One-time production warning when the origin allowlist is effectively
+  // disabled. Emitted at middleware-construction time, not per-request.
+  warnIfOriginsOpenInProd(config)
+
   return async function handler(req: Request, res: Response, next: NextFn) {
+    // Surface a clear diagnostic when the consumer forgot to wire
+    // `express.json()` upstream — without it `req.body` is `undefined`
+    // and validation rejects with a confusing "Invalid request body".
+    if (req.body === undefined) {
+      res.status(500).json({
+        error:
+          'feedbackMiddleware requires express.json() middleware upstream',
+      })
+      return
+    }
     // Audit log helper. Failures are caught and logged via `console.error` —
     // audit logging never breaks the request flow.
     const recordAudit = async (event: { type: string; [key: string]: unknown }) => {
@@ -178,4 +192,21 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
       next(err)
     }
   }
+}
+
+/**
+ * Emit a one-time `console.warn` if the middleware is constructed in
+ * production with no `allowedOrigins` allowlist. An empty allowlist is
+ * treated as allow-all (see `checkOrigin` in `./security`) — useful in
+ * development but dangerous as a production default.
+ */
+function warnIfOriginsOpenInProd(config: FeedbackHandlerConfig): void {
+  if (typeof process === 'undefined') return
+  if (process.env?.NODE_ENV !== 'production') return
+  if (config.allowedOrigins && config.allowedOrigins.length > 0) return
+  console.warn(
+    '[snapfeed] allowedOrigins is empty in production — origin allowlist is ' +
+      'effectively disabled (allow-all). Set allowedOrigins to lock down ' +
+      'accepted browser origins.'
+  )
 }

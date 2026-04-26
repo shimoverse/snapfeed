@@ -33,10 +33,19 @@ export { anthropicProvider } from './providers/anthropic'
 export { openaiProvider } from './providers/openai'
 export { ollamaProvider } from './providers/ollama'
 
-// Conservative pre-call estimate. Real token counts come back from the
+// Per-feature pre-call token estimate. Real token counts come back from the
 // provider via `tokensUsed` and are recorded against the budget after the
 // call succeeds. We use this only to gate the call up front.
-const ESTIMATED_MAX_TOKENS_PER_CALL = 512
+//
+// These values match each feature's `maxTokens` so the budget pre-gate is
+// neither over- nor under-provisioned. A single one-size-fits-all estimate
+// (the old `ESTIMATED_MAX_TOKENS_PER_CALL = 512`) was ~10x too generous for
+// title and ~30x for severity, which made the pre-gate effectively useless.
+export const MAX_TOKENS_PER_FEATURE = {
+  title: 64,
+  severity: 16,
+  repro: 256,
+} as const
 
 /**
  * Returns the right provider based on `config.provider`. Returns `null` when
@@ -115,7 +124,7 @@ export async function applyLLM(
 
   // ── title ────────────────────────────────────────────────────────────────
   if (features.title) {
-    if (budget && !budget.allow(ESTIMATED_MAX_TOKENS_PER_CALL)) {
+    if (budget && !budget.allow(MAX_TOKENS_PER_FEATURE.title)) {
       pushWarning(result, 'title: skipped (budget exhausted)')
     } else {
       try {
@@ -132,12 +141,18 @@ export async function applyLLM(
           system:
             'Write a 6-12 word, sentence-case title for a developer feedback ticket. Output only the title, no quotes, no prefix.',
           user: userMsg,
-          maxTokens: 64,
+          maxTokens: MAX_TOKENS_PER_FEATURE.title,
           signal,
         })
-        result.tokensUsed += tokensUsed
-        budget?.record(tokensUsed)
-        const title = out.trim().replace(/^["']|["']$/g, '')
+        result.tokensUsed += accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.title, result, 'title')
+        budget?.record(accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.title))
+        // Strip wrapping quotes from BOTH sides — the old single-character
+        // /^["']|["']$/g regex stripped only one quote, leaving '"foo"' as
+        // 'foo' fine but '""foo""' as '"foo"'.
+        const title = out
+          .trim()
+          .replace(/^["']+/, '')
+          .replace(/["']+$/, '')
         if (title) result.title = title
       } catch (err) {
         pushWarning(result, `title: ${describeError(err)}`)
@@ -147,7 +162,7 @@ export async function applyLLM(
 
   // ── severity ─────────────────────────────────────────────────────────────
   if (features.severity) {
-    if (budget && !budget.allow(ESTIMATED_MAX_TOKENS_PER_CALL)) {
+    if (budget && !budget.allow(MAX_TOKENS_PER_FEATURE.severity)) {
       pushWarning(result, 'severity: skipped (budget exhausted)')
     } else {
       try {
@@ -164,14 +179,17 @@ export async function applyLLM(
           system:
             'Classify this feedback as one of: p0 (broken/blocking), p1 (functional bug), p2 (minor issue), nit (cosmetic). Output only the label.',
           user: userMsg,
-          maxTokens: 16,
+          maxTokens: MAX_TOKENS_PER_FEATURE.severity,
           signal,
         })
-        result.tokensUsed += tokensUsed
-        budget?.record(tokensUsed)
+        result.tokensUsed += accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.severity, result, 'severity')
+        budget?.record(accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.severity))
         const sev = parseSeverity(out)
         if (sev) result.severity = sev
-        else pushWarning(result, `severity: unparseable response "${out.slice(0, 40)}"`)
+        // Hash, don't echo: the unparseable provider output may include
+        // fragments of the user's prompt (prompt-injection scenario) which
+        // would land in result.warnings and then in consumer logs.
+        else pushWarning(result, `severity: unparseable response (length=${out.length})`)
       } catch (err) {
         pushWarning(result, `severity: ${describeError(err)}`)
       }
@@ -180,7 +198,7 @@ export async function applyLLM(
 
   // ── repro ────────────────────────────────────────────────────────────────
   if (features.repro) {
-    if (budget && !budget.allow(ESTIMATED_MAX_TOKENS_PER_CALL)) {
+    if (budget && !budget.allow(MAX_TOKENS_PER_FEATURE.repro)) {
       pushWarning(result, 'repro: skipped (budget exhausted)')
     } else {
       try {
@@ -188,6 +206,13 @@ export async function applyLLM(
           `Feedback: ${text}`,
           pageUrlSafe ? `URL: ${pageUrlSafe}` : '',
           payload.metadata?.viewport ? `Viewport: ${payload.metadata.viewport}` : '',
+          // Console errors are often the strongest reproduction signal —
+          // a TypeError on pay.js:42 tells the LLM what to look for far
+          // better than free-text alone. Title/severity already include
+          // these; repro should too.
+          firstThreeErrors.length
+            ? `Console errors:\n${firstThreeErrors.join('\n')}`
+            : '',
         ]
           .filter(Boolean)
           .join('\n')
@@ -196,11 +221,11 @@ export async function applyLLM(
           system:
             'Extract steps to reproduce as a numbered list. Output as JSON array of strings. If unclear, output [].',
           user: userMsg,
-          maxTokens: 256,
+          maxTokens: MAX_TOKENS_PER_FEATURE.repro,
           signal,
         })
-        result.tokensUsed += tokensUsed
-        budget?.record(tokensUsed)
+        result.tokensUsed += accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.repro, result, 'repro')
+        budget?.record(accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.repro))
         const steps = parseSteps(out)
         if (steps && steps.length > 0) result.reproSteps = steps
       } catch (err) {
@@ -218,6 +243,36 @@ function pushWarning(result: LLMRunResult, msg: string): void {
   result.degraded = true
   result.warnings = result.warnings ?? []
   result.warnings.push(msg)
+}
+
+/**
+ * Reconcile a provider's `tokensUsed` against the per-feature ceiling.
+ *
+ * Some OpenAI-compatible servers omit `usage` in their response. The provider
+ * signals this by returning the sentinel `tokensUsed: -1`. When the runner
+ * sees the sentinel, it bills the per-feature `maxTokens` ceiling against
+ * the budget (so unmetered traffic can't silently exhaust quota) and pushes
+ * a one-time warning per feature.
+ *
+ * The `result` and `feature` parameters are optional so this helper can be
+ * called twice per call (once for `result.tokensUsed += …`, once for
+ * `budget?.record(…)`) without duplicating the warning.
+ */
+function accountTokens(
+  reported: number,
+  cap: number,
+  result?: LLMRunResult,
+  feature?: 'title' | 'severity' | 'repro'
+): number {
+  if (reported < 0) {
+    if (result && feature) {
+      const tag = `${feature}: provider omitted usage; billing maxTokens=${cap} to budget`
+      const already = result.warnings?.some(w => w === tag)
+      if (!already) pushWarning(result, tag)
+    }
+    return cap
+  }
+  return reported
 }
 
 function describeError(err: unknown): string {

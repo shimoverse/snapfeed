@@ -27,6 +27,16 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   other: '📝',
 }
 
+function extensionForMime(mimeType: string): string {
+  // Map common image MIME types to a safe filename extension. Avoids edge cases
+  // like `image/svg+xml` producing `screenshot.svg+xml` (which Telegram rejects).
+  if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return 'jpg'
+  if (mimeType.includes('webp')) return 'webp'
+  if (mimeType.includes('gif')) return 'gif'
+  if (mimeType.includes('svg')) return 'svg'
+  return 'png'
+}
+
 function buildMessage(payload: FeedbackPayload): string {
   const categoryEmoji = payload.category ? (CATEGORY_EMOJIS[payload.category] ?? '') : ''
   const categoryLabel = payload.category
@@ -98,42 +108,54 @@ export function telegramAdapter(options: TelegramAdapterOptions): FeedbackAdapte
           }
         }
 
-        const textData = (await textRes.json()) as {
+        // Guard against malformed 2xx bodies (rare, but seen at edge proxies):
+        // a JSON parse failure should not turn a successful delivery into an
+        // error. Treat unparseable success body as an empty result.
+        const textData = (await textRes.json().catch(() => ({}))) as {
           result?: { message_id?: number }
         }
         const messageId = String(textData.result?.message_id ?? '')
 
         const warnings: string[] = []
 
-        // Optionally send screenshot as a follow-up photo
+        // Optionally send screenshot as a follow-up photo. Wrapped so a
+        // malformed base64 (atob throws) or upload failure does not turn a
+        // successful text delivery into an error — the screenshot failure is
+        // surfaced as a warning instead.
         if (sendScreenshot && payload.screenshot?.base64) {
-          const mimeType = payload.screenshot.mimeType || 'image/png'
-          const byteChars = atob(payload.screenshot.base64)
-          const byteNums = new Array(byteChars.length)
-          for (let i = 0; i < byteChars.length; i++) {
-            byteNums[i] = byteChars.charCodeAt(i)
-          }
-          const byteArray = new Uint8Array(byteNums)
-          const blob = new Blob([byteArray as BlobPart], { type: mimeType })
+          try {
+            const mimeType = payload.screenshot.mimeType || 'image/png'
+            const byteChars = atob(payload.screenshot.base64)
+            const byteNums = new Array(byteChars.length)
+            for (let i = 0; i < byteChars.length; i++) {
+              byteNums[i] = byteChars.charCodeAt(i)
+            }
+            const byteArray = new Uint8Array(byteNums)
+            const blob = new Blob([byteArray as BlobPart], { type: mimeType })
 
-          const form = new FormData()
-          form.append('chat_id', chatId)
-          form.append('photo', blob, `screenshot.${mimeType.split('/')[1] ?? 'png'}`)
-          form.append('caption', `📸 Screenshot for feedback #${messageId}`)
+            const form = new FormData()
+            form.append('chat_id', chatId)
+            form.append('photo', blob, `screenshot.${extensionForMime(mimeType)}`)
+            form.append('caption', `📸 Screenshot for feedback #${messageId}`)
 
-          const photoRes = await fetch(`${baseUrl}/sendPhoto`, {
-            method: 'POST',
-            body: form,
-          })
+            const photoRes = await fetch(`${baseUrl}/sendPhoto`, {
+              method: 'POST',
+              body: form,
+            })
 
-          if (!photoRes.ok) {
-            // Screenshot failed but text was sent — surface as a warning
-            // so the caller can show "delivered, screenshot upload failed"
-            // instead of silently dropping it.
-            const detail = await photoRes.text().catch(() => '')
-            warnings.push(
-              `screenshot upload failed (HTTP ${photoRes.status}): ${detail.slice(0, 200)}`
-            )
+            if (!photoRes.ok) {
+              // Screenshot failed but text was sent — surface as a warning
+              // so the caller can show "delivered, screenshot upload failed"
+              // instead of silently dropping it.
+              const detail = await photoRes.text().catch(() => '')
+              warnings.push(
+                `screenshot upload failed (HTTP ${photoRes.status}): ${detail.slice(0, 200)}`
+              )
+              console.warn(`[telegram adapter] ${warnings[warnings.length - 1]}`)
+            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err)
+            warnings.push(`screenshot upload failed: ${detail}`)
             console.warn(`[telegram adapter] ${warnings[warnings.length - 1]}`)
           }
         }

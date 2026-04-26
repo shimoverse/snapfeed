@@ -38,6 +38,21 @@ export interface FeedbackMetadata {
   userAgent: string
   /** Last N console errors captured since page load */
   consoleErrors: string[]
+  /**
+   * Sanctioned extension seam for arbitrary string-valued context
+   * (build SHA, git branch, environment, feature flags, release channel).
+   *
+   * This is the canonical way to attach build / release / flag context to a
+   * payload until first-class top-level provider props (`buildId`, `gitSha`,
+   * `env`) ship in v0.6. Keys/values are forwarded as-is to every adapter
+   * destination and to the audit log.
+   *
+   * Set via the provider's `metadata` prop or in the server handler's
+   * `onReceive` hook.
+   *
+   * @example { gitSha: 'abc123', env: 'staging', buildId: '4521' }
+   */
+  custom?: Record<string, string>
 }
 
 export interface FeedbackScreenshot {
@@ -45,6 +60,86 @@ export interface FeedbackScreenshot {
   base64: string
   /** e.g. "image/png", "image/jpeg" */
   mimeType: string
+}
+
+// ─── i18n messages ───────────────────────────────────────────────────────────
+
+/**
+ * Every user-facing string in the default widget UI. Override any subset via
+ * `FeedbackProviderConfig.messages` to translate or rebrand.
+ *
+ * Keys are stable across patch versions; new keys may be added in minor
+ * versions but never removed without a major bump.
+ */
+export interface FeedbackMessages {
+  /** Modal heading */
+  title: string
+  /** Sub-heading line under the title */
+  subtitle: string
+  /** Textarea placeholder */
+  textareaPlaceholder: string
+  /** Visually-hidden textarea label */
+  textareaLabel: string
+  /** Send button text */
+  sendButton: string
+  /** Send button while submitting */
+  sendingButton: string
+  /** Cancel / close button */
+  cancelButton: string
+  /** Bottom-of-modal hint, e.g. "Esc to dismiss · Ctrl+Enter to send" */
+  hint: string
+  /** Success heading after submit */
+  successTitle: string
+  /** Success body, supports {appName} placeholder */
+  successBody: string
+  /** "Send another" CTA in success state */
+  sendAnother: string
+  /** Floating trigger button text */
+  triggerLabel: string
+  /** Tooltip on the floating trigger */
+  triggerTooltip: string
+  /** "Sending as Ananya · change" identity readout (supports {who} placeholder) */
+  sendingAs: string
+  /** "(set name)" link when no identity */
+  setName: string
+  /** Identity prompt heading */
+  identityPromptTitle: string
+  /** Identity prompt body */
+  identityPromptBody: string
+  /** Category labels */
+  categoryBug: string
+  categoryIdea: string
+  categoryQuestion: string
+  categoryPraise: string
+  categoryOther: string
+  /** Capturing screenshot status */
+  capturingScreenshot: string
+  /** Annotate screenshot button */
+  annotateButton: string
+  /** Replace screenshot button */
+  replaceScreenshot: string
+  /** Remove screenshot button */
+  removeScreenshot: string
+  /** "Attach or paste screenshot (⌘V)" CTA when no image is attached */
+  attachScreenshot: string
+  /** Drop zone hint when dragging a file over */
+  dropZoneHint: string
+  /** Voice record button label */
+  voiceRecord: string
+  /** Voice recording in progress */
+  voiceRecording: string
+  /** Voice stop button */
+  voiceStop: string
+  /** Screen record button label */
+  screenRecord: string
+  /** Screen recording in progress */
+  screenRecording: string
+  /** Generic error fallback */
+  errorTitle: string
+  /** Partial-success heading */
+  partialSuccessTitle: string
+  /** Partial-success body, supports {okCount} {failedCount} placeholders */
+  partialSuccessBody: string
 }
 
 // ─── Adapter ──────────────────────────────────────────────────────────────────
@@ -101,7 +196,7 @@ export interface FeedbackProviderConfig {
   theme?: FeedbackTheme
   /**
    * Accent/brand color for buttons and focus rings.
-   * @default "#D4714B"
+   * @default "#B85A36"
    */
   accentColor?: string
   /**
@@ -131,6 +226,53 @@ export interface FeedbackProviderConfig {
    */
   user?: FeedbackUser
   /**
+   * Mount a small floating trigger button by default (bottom-right). Lets a
+   * tester who doesn't know the hotkey discover that the widget exists.
+   *
+   * Set to `false` to hide the trigger entirely (hotkey-only mode), or to a
+   * custom CSS selector to portal the trigger into your own DOM.
+   *
+   * @default true
+   */
+  floatingButton?: boolean | string
+  /**
+   * Persist the in-progress draft (text + category + screenshot flag) to
+   * `sessionStorage` keyed by `pageUrl`. Survives Esc / outside-click /
+   * accidental hotkey-toggle. Cleared on successful submit.
+   *
+   * @default true
+   */
+  persistDraft?: boolean
+  /**
+   * Persist `user.name` / `user.email` in `localStorage` so a tester who
+   * self-identifies once doesn't have to retype it. Merged with the
+   * provider's `user` prop (provider wins).
+   *
+   * @default true
+   */
+  persistIdentity?: boolean
+  /**
+   * Override any user-facing string in the widget UI. Falls back to English
+   * for any key not provided. Useful for i18n and brand-voice tweaks
+   * ("Send" → "Ship it").
+   *
+   * Provide a flat string-key map. See `defaultMessages` in `src/messages.ts`
+   * for the full key list (~20 keys: title, placeholder, send button,
+   * categories, success/error states, etc.).
+   */
+  messages?: Partial<FeedbackMessages>
+  /**
+   * Extra metadata to attach to every payload. Merged into
+   * `payload.metadata.custom` (see {@link FeedbackMetadata.custom}).
+   *
+   * Use for build SHA, git branch, environment, feature flags. Until
+   * first-class top-level `buildId`/`gitSha`/`env` props land in v0.6, this
+   * is the sanctioned way.
+   *
+   * @example { gitSha: process.env.NEXT_PUBLIC_GIT_SHA!, env: 'staging' }
+   */
+  metadata?: Record<string, string>
+  /**
    * Custom API endpoint to POST feedback to.
    * When provided, the widget sends to this URL instead of calling adapters directly.
    * Use with createFeedbackHandler() on the server.
@@ -149,12 +291,37 @@ export interface FeedbackProviderConfig {
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
+/**
+ * Per-adapter delivery outcome surfaced back to the UI after a submit.
+ * Mirrors the order of `config.adapters`. When the provider routes via
+ * `apiUrl` instead of in-process adapters, this list is empty (the server
+ * may report destinations in a future protocol revision).
+ */
+export interface FeedbackDeliveryRecord {
+  /** Adapter name (e.g. "slack", "linear", "telegram"). */
+  name: string
+  /** True if the adapter accepted the payload (warnings still allowed). */
+  ok: boolean
+  /** Adapter-supplied delivery ID (e.g. Slack ts, Linear issue id). */
+  deliveryId?: string
+  /** Failure reason when `ok === false`. */
+  error?: string
+  /** Non-fatal issues (e.g. "screenshot upload failed but message went through"). */
+  warnings?: string[]
+}
+
 export interface FeedbackContextValue {
   isOpen: boolean
   open: () => void
   close: () => void
   toggle: () => void
   submit: (payload: Omit<FeedbackPayload, 'timestamp' | 'appName'>) => Promise<void>
+  /**
+   * Delivery results from the most recent successful (or partially-successful)
+   * `submit()`. Cleared on the next submit. Empty when routed through `apiUrl`
+   * (the server doesn't currently echo back per-adapter results).
+   */
+  lastResults: FeedbackDeliveryRecord[]
   config: Required<
     Pick<
       FeedbackProviderConfig,

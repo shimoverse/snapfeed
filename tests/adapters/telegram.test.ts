@@ -97,6 +97,71 @@ describe('telegramAdapter', () => {
     expect(r.warnings?.[0]).toContain('413')
   })
 
+  it('returns ok=true when sendMessage 2xx body is malformed JSON (graceful parse)', async () => {
+    // Edge proxies very rarely return a 200 with a truncated/invalid JSON body.
+    // The adapter should still treat the delivery as successful — just with an
+    // empty messageId — instead of throwing and turning success into an error.
+    fetchMock.mockResolvedValueOnce(
+      new Response('not-json{{{', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const adapter = telegramAdapter({ botToken: 't', chatId: '123' })
+    const r = await adapter.send(basePayload)
+
+    expect(r.ok).toBe(true)
+    expect(r.deliveryId).toBe('')
+  })
+
+  it('returns ok=true with warning when atob throws on malformed base64', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { ok: true, result: { message_id: 11 } })
+    )
+
+    const adapter = telegramAdapter({ botToken: 't', chatId: '123' })
+    const r = await adapter.send({
+      ...basePayload,
+      // `!` is not in the base64 alphabet → atob throws InvalidCharacterError.
+      screenshot: { base64: '!!!not-base64!!!', mimeType: 'image/png' },
+    })
+
+    expect(r.ok).toBe(true)
+    expect(r.deliveryId).toBe('11')
+    expect(r.warnings).toBeDefined()
+    expect(r.warnings?.[0]).toContain('screenshot upload failed')
+    // Only one fetch — sendPhoto was never reached.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses correct extension for image/svg+xml (svg, not svg+xml)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, { ok: true, result: { message_id: 1 } })
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+
+    const adapter = telegramAdapter({ botToken: 't', chatId: '123' })
+    await adapter.send({
+      ...basePayload,
+      screenshot: { base64: 'aGVsbG8=', mimeType: 'image/svg+xml' },
+    })
+
+    const photoCall = fetchMock.mock.calls[1]!
+    const form = photoCall[1].body as FormData
+    const photo = form.get('photo')
+    expect(photo).toBeInstanceOf(Blob)
+    // Filename is the third arg to FormData.append; vitest exposes it via the
+    // File wrapper that FormData creates. Read it through the entries() API.
+    let filename = ''
+    for (const [k, v] of form.entries()) {
+      if (k === 'photo' && v instanceof File) filename = v.name
+    }
+    expect(filename).toBe('screenshot.svg')
+    expect(filename).not.toContain('+')
+  })
+
   it('does not call sendPhoto when sendScreenshot=false', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { ok: true, result: { message_id: 7 } })

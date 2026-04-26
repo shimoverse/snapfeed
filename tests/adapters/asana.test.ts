@@ -176,6 +176,26 @@ describe('asanaAdapter', () => {
     expect(result.warnings?.[0]).toContain('413')
   })
 
+  it('returns ok=false (no task gid) when 2xx body is malformed JSON', async () => {
+    // Malformed body must not throw — the missing-gid branch should fire instead.
+    fetchMock.mockResolvedValueOnce(
+      new Response('not-json{{{', {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const adapter = asanaAdapter({
+      accessToken: 'pat',
+      workspaceId: 'ws_1',
+      projectId: 'proj_1',
+    })
+    const result = await adapter.send(basePayload)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('no task gid')
+  })
+
   it('makes only a single fetch when no screenshot is provided', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(201, { data: { gid: 'task_1' } })

@@ -152,4 +152,86 @@ describe('openaiProvider', () => {
       /openai/
     )
   })
+
+  // ── o-series reasoning models use max_completion_tokens, not max_tokens ──
+
+  it('uses max_tokens for gpt-4 series models (default)', async () => {
+    mockOk({
+      choices: [{ message: { content: 'ok' } }],
+      usage: { total_tokens: 1 },
+    })
+    const provider = openaiProvider({ ...baseConfig, model: 'gpt-4o-mini' })
+    await provider.complete({ system: 's', user: 'u', maxTokens: 64 })
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_tokens).toBe(64)
+    expect(body.max_completion_tokens).toBeUndefined()
+  })
+
+  it('switches to max_completion_tokens for o3-mini', async () => {
+    mockOk({
+      choices: [{ message: { content: 'ok' } }],
+      usage: { total_tokens: 1 },
+    })
+    const provider = openaiProvider({ ...baseConfig, model: 'o3-mini' })
+    await provider.complete({ system: 's', user: 'u', maxTokens: 64 })
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_completion_tokens).toBe(64)
+    expect(body.max_tokens).toBeUndefined()
+  })
+
+  it('switches to max_completion_tokens for o1, o3, o4, o5 prefixes', async () => {
+    for (const model of ['o1', 'o1-preview', 'o3', 'o4-mini', 'o5']) {
+      mockOk({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { total_tokens: 1 },
+      })
+      const provider = openaiProvider({ ...baseConfig, model })
+      await provider.complete({ system: 's', user: 'u' })
+      const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+      const [, init] = fetchMock.mock.calls.at(-1)!
+      const body = JSON.parse(init.body as string)
+      expect(body.max_completion_tokens, `model=${model}`).toBeDefined()
+      expect(body.max_tokens, `model=${model}`).toBeUndefined()
+    }
+  })
+
+  it('does NOT misclassify "openai/o-style-name" with no leading o-digit', async () => {
+    // Bare "omni" or "octopus" must not flip the param. The pickTokenParam
+    // regex is anchored: ^o\d+(?:-|$)
+    mockOk({
+      choices: [{ message: { content: 'ok' } }],
+      usage: { total_tokens: 1 },
+    })
+    const provider = openaiProvider({ ...baseConfig, model: 'omni-experimental' })
+    await provider.complete({ system: 's', user: 'u' })
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    expect(body.max_tokens).toBeDefined()
+    expect(body.max_completion_tokens).toBeUndefined()
+  })
+
+  // ── usage missing → tokensUsed sentinel -1 ──
+
+  it('returns tokensUsed: -1 when the response omits the usage field', async () => {
+    mockOk({ choices: [{ message: { content: 'ok' } }] })
+    const provider = openaiProvider(baseConfig)
+    const out = await provider.complete({ system: 's', user: 'u' })
+    expect(out.text).toBe('ok')
+    expect(out.tokensUsed).toBe(-1)
+  })
+
+  it('returns tokensUsed: -1 when usage exists but total_tokens is missing', async () => {
+    mockOk({ choices: [{ message: { content: 'ok' } }], usage: {} })
+    const provider = openaiProvider(baseConfig)
+    const out = await provider.complete({ system: 's', user: 'u' })
+    expect(out.tokensUsed).toBe(-1)
+  })
 })

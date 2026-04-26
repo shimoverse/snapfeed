@@ -222,6 +222,22 @@ describe('notionAdapter', () => {
     expect(imageBlock).toBeUndefined()
   })
 
+  it('returns ok=false (no page id) when 2xx body is malformed JSON', async () => {
+    // Malformed body must not throw — the missing-id branch should fire instead.
+    fetchMock.mockResolvedValueOnce(
+      new Response('not-json{{{', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const adapter = notionAdapter({ apiKey: 'k', databaseId: 'db_1' })
+    const result = await adapter.send(basePayload)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('no page id')
+  })
+
   it('makes only a single fetch when no screenshot is provided', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { object: 'page', id: 'page_1' })

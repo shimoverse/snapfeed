@@ -160,4 +160,20 @@ describe('clickUpAdapter', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it('returns ok=false (no task id) when 2xx body is malformed JSON', async () => {
+    // Malformed body must not throw — the missing-id branch should fire instead.
+    fetchMock.mockResolvedValueOnce(
+      new Response('not-json{{{', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const adapter = clickUpAdapter({ apiToken: 'pk', listId: '1' })
+    const result = await adapter.send(basePayload)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('no task id')
+  })
 })

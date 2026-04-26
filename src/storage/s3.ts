@@ -281,6 +281,24 @@ export function s3Storage(options: S3StorageOptions): StorageAdapter {
     acl,
   } = options
 
+  // Validate at construction time that the endpoint host doesn't already
+  // include the bucket prefix (`<bucket>.host`) — otherwise `buildUrl()`
+  // would produce a doubled `<bucket>.<bucket>.host` and every PUT would
+  // 404 with a confusing signing-mismatch error. Cleanest to fail early.
+  if (endpoint) {
+    try {
+      const parsed = new URL(endpoint)
+      if (parsed.host.startsWith(`${bucket}.`)) {
+        throw new Error('s3Storage: endpoint must not include the bucket name')
+      }
+    } catch (err) {
+      // Re-throw our own assertion verbatim, but surface URL parse errors
+      // as a clearer adapter-construction error.
+      if (err instanceof Error && err.message.startsWith('s3Storage:')) throw err
+      throw new Error(`s3Storage: endpoint is not a valid URL: ${endpoint}`)
+    }
+  }
+
   return {
     name: 's3',
     async upload(input: StorageUploadInput): Promise<StorageUploadResult> {

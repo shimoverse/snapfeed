@@ -980,7 +980,7 @@ export function FeedbackInbox({
                                 </div>
                                 <img
                                   src={`data:${row.image_mime_type ?? 'image/png'};base64,${row.image_base64}`}
-                                  alt="Feedback screenshot"
+                                  alt={`Screenshot of ${row.page_name ?? row.page_url ?? 'feedback page'}`}
                                   style={{
                                     maxWidth: '100%',
                                     maxHeight: '300px',

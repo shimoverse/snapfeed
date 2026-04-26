@@ -219,15 +219,22 @@ export function notionAdapter(options: NotionAdapterOptions): FeedbackAdapter {
         }
 
         if (payload.screenshot?.base64) {
-          const approxBytes = Math.floor(payload.screenshot.base64.length * 0.75)
-          if (approxBytes > SCREENSHOT_DATA_URI_LIMIT_BYTES) {
-            warnings.push(
-              `screenshot skipped: data URI ${approxBytes} bytes exceeds Notion limit (~1MB)`
-            )
-          } else {
-            const mime = payload.screenshot.mimeType || 'image/png'
-            const dataUri = `data:${mime};base64,${payload.screenshot.base64}`
-            children.push(imageBlock(dataUri))
+          // Wrapped so any future failure in screenshot handling cannot abort
+          // the whole page creation — the page still goes out with a warning.
+          try {
+            const approxBytes = Math.floor(payload.screenshot.base64.length * 0.75)
+            if (approxBytes > SCREENSHOT_DATA_URI_LIMIT_BYTES) {
+              warnings.push(
+                `screenshot skipped: data URI ${approxBytes} bytes exceeds Notion limit (~1MB)`
+              )
+            } else {
+              const mime = payload.screenshot.mimeType || 'image/png'
+              const dataUri = `data:${mime};base64,${payload.screenshot.base64}`
+              children.push(imageBlock(dataUri))
+            }
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err)
+            warnings.push(`screenshot upload failed: ${detail}`)
           }
         }
 
@@ -251,7 +258,9 @@ export function notionAdapter(options: NotionAdapterOptions): FeedbackAdapter {
           }
         }
 
-        const json = (await res.json()) as {
+        // Guard against malformed 2xx bodies — a JSON parse failure here will
+        // be caught below as "no page id" rather than crashing the adapter.
+        const json = (await res.json().catch(() => ({}))) as {
           object?: string
           id?: string
           message?: string

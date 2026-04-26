@@ -149,7 +149,7 @@ describe('applyLLM — single features', () => {
   })
 
   it('returns reproSteps when features.repro is on', async () => {
-    stubFetchSequence([
+    const fetchMock = stubFetchSequence([
       openaiResponse(
         '["Open checkout", "Click pay button", "Observe nothing happens"]',
         40
@@ -166,6 +166,16 @@ describe('applyLLM — single features', () => {
       'Click pay button',
       'Observe nothing happens',
     ])
+
+    // Repro user message must include console errors — they're often the
+    // strongest reproduction signal.
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(init.body as string)
+    const userMsg = body.messages.find(
+      (m: { role: string; content: string }) => m.role === 'user'
+    ).content as string
+    expect(userMsg).toContain('Console errors:')
+    expect(userMsg).toContain('TypeError: cannot read property of undefined at pay.js:42')
   })
 
   it('parses repro steps wrapped in a ```json fence', async () => {

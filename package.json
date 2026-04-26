@@ -1,15 +1,17 @@
 {
   "name": "snapfeed",
-  "version": "0.5.1",
-  "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice. Pluggable adapters: Slack, JIRA, Linear, Asana, ClickUp, Notion, MS Teams, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. BYOK LLM (Anthropic, OpenAI, Azure, Bedrock, Ollama). Routing config + Release Campaigns. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
-  "author": "snapfeed contributors",
+  "version": "0.5.2",
+  "description": "Internal-dogfooding feedback widget for React/Next.js. Hotkey, screenshot, voice. Slack/JIRA/Linear/Discord adapters. Self-hostable, BYOK LLM, MIT.",
+  "author": {
+    "name": "shimoverse",
+    "email": "shimoverse@gmail.com"
+  },
   "license": "MIT",
   "keywords": [
     "feedback",
     "widget",
     "react",
     "nextjs",
-    "developer-tools",
     "devtools",
     "dogfooding",
     "internal-feedback",
@@ -17,28 +19,10 @@
     "beta-testing",
     "screenshot",
     "annotation",
+    "voice",
     "slack",
     "jira",
-    "linear",
-    "github-issues",
-    "discord",
-    "google-sheets",
-    "supabase",
-    "telegram",
-    "asana",
-    "clickup",
-    "notion",
-    "microsoft-teams",
-    "llm",
-    "byok",
-    "anthropic",
-    "openai",
-    "ollama",
-    "bedrock",
-    "voice-feedback",
-    "release-campaigns",
-    "audit-log",
-    "snapfeed"
+    "linear"
   ],
   "repository": {
     "type": "git",
@@ -171,7 +155,8 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react-dom": ">=18.0.0",
+    "html2canvas": "^1.4.1"
   },
   "peerDependenciesMeta": {
     "html2canvas": {
@@ -199,8 +184,5 @@
     "typescript": "^5.4.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^1.6.0"
-  },
-  "optionalDependencies": {
-    "html2canvas": "^1.4.1"
   }
 }

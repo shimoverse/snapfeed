@@ -296,6 +296,25 @@ export function createVoiceRecorder(options: VoiceRecorderOptions = {}): VoiceRe
     },
 
     cancel() {
+      // Race notes for cancel() vs the auto-stop setTimeout:
+      //   1. cancel() before auto-stop fires:
+      //        sets cancelled=true, calls recorder.stop(), clears the
+      //        auto-stop timer in clearTimers() so it never runs. ✓
+      //   2. auto-stop fires before cancel():
+      //        calls recorderObj.stop() which sets stopResolve/Reject from
+      //        the *original* caller's promise, then calls recorder.stop().
+      //        recorder.onstop sees cancelled=false and resolves normally.
+      //        cancel() arriving later finds recording=false (set by
+      //        onstop), early-returns through the !recording branch, and
+      //        just releases any stream remnants. ✓
+      //   3. cancel() races with auto-stop's recorder.stop() but onstop
+      //      hasn't fired yet:
+      //        cancel() sets cancelled=true and tries recorder.stop()
+      //        again (caught — harmless). The pending onstop sees
+      //        cancelled=true and discards the buffered chunks. The
+      //        auto-stop's stop() promise resolution path is bypassed
+      //        because onstop returns early; the stop()-promise hangs but
+      //        nobody is awaiting it (auto-stop swallows via .catch()). ✓
       if (!recording) {
         // Even if not recording, make sure any leftover stream is released.
         releaseStream()

@@ -45,7 +45,22 @@ export interface LLMConfig {
   features?: LLMFeatureToggles
   /** Token budget. Fails closed when exceeded in the current day. */
   budget?: { dailyTokens: number }
-  /** Run regex+entropy redaction on payload.text + console errors before sending to the LLM. */
+  /**
+   * Run regex+entropy redaction on payload.text + console errors before
+   * sending to the LLM.
+   *
+   * **Default: `false`.** Disabled by default to preserve full payload
+   * fidelity for the LLM (redaction tags like `[EMAIL]` and `[REDACTED]`
+   * can degrade title/severity/repro quality on otherwise-benign payloads).
+   * Enable when shipping payloads to a third-party LLM endpoint where
+   * leaking PII or secrets in feedback text is a concern.
+   *
+   * Note: server-side console-error sanitization (in `validatePayload`)
+   * runs unconditionally — that pass strips obvious secret shapes
+   * regardless of this flag. `redactBeforeLLM` adds emails, credit-card
+   * digit groups, and high-entropy strings on top, applied to
+   * `payload.text` and `pageUrl` as well.
+   */
   redactBeforeLLM?: boolean
   /** Custom HTTP headers, e.g. { 'OpenAI-Organization': '...' }. */
   headers?: Record<string, string>

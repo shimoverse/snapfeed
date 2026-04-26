@@ -30,7 +30,9 @@ export const LIGHT_THEME: ThemeColors = {
   overlay: 'rgba(0,0,0,0.45)',
   error: '#D64545',
   errorBg: 'rgba(214,69,69,0.08)',
-  success: '#2D9D6F',
+  // WCAG AA: was #2D9D6F (~3.5:1 against white). Bumped to a deeper
+  // green that clears 4.5:1 for the small success-body text.
+  success: '#1F7A56',
   inputBg: '#F5F3EF',
   attachBg: '#F0EDE8',
   attachBorder: 'rgba(0,0,0,0.18)',
@@ -139,6 +141,33 @@ export function injectAnimations(): void {
     .__dtfb_overlay {
       animation: __dtfb_fadeIn 0.15s ease forwards;
     }
+    /* Honor the OS-level reduced-motion preference. WCAG 2.3.3 guidance:
+       avoid motion that could trigger vestibular discomfort. We disable
+       both the entry animation and any inline transitions inside the
+       widget tree. */
+    @media (prefers-reduced-motion: reduce) {
+      .__dtfb_widget,
+      .__dtfb_overlay,
+      .__dtfb_widget * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   `
   document.head.appendChild(style)
+}
+
+/**
+ * Test-only: reset the injected-state guard. Production callers should
+ * never need this — `injectAnimations()` is idempotent. Tests use this to
+ * exercise the inject path repeatedly.
+ *
+ * @internal
+ */
+export function __resetAnimationsForTest(): void {
+  animationInjected = false
+  if (typeof document !== 'undefined') {
+    const existing = document.querySelectorAll('style[data-devtools-feedback]')
+    existing.forEach(node => node.parentNode?.removeChild(node))
+  }
 }

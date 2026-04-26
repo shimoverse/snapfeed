@@ -36,6 +36,7 @@ export const AutoEnvKeys = {
   SLACK_USERNAME: 'SNAPFEED_SLACK_USERNAME',
   SLACK_CHANNEL: 'SNAPFEED_SLACK_CHANNEL',
   DISCORD_WEBHOOK: 'SNAPFEED_DISCORD_WEBHOOK',
+  DISCORD_MENTION_ROLE: 'SNAPFEED_DISCORD_MENTION_ROLE',
   GITHUB_TOKEN: 'SNAPFEED_GITHUB_TOKEN',
   GITHUB_REPO: 'SNAPFEED_GITHUB_REPO',
   TELEGRAM_BOT_TOKEN: 'SNAPFEED_TELEGRAM_BOT_TOKEN',
@@ -50,6 +51,34 @@ function readEnv(key: string): string | undefined {
   if (typeof process === 'undefined' || !process.env) return undefined
   const v = process.env[key]
   return v && v.length > 0 ? v : undefined
+}
+
+/**
+ * Common unprefixed env vars users sometimes set when they forget the
+ * SNAPFEED_ prefix. We warn (once per call) when one of these is set but
+ * its SNAPFEED_-prefixed sibling is not — that's nearly always a typo
+ * and silently falling back to the dev defaults is confusing.
+ */
+const COMMON_TYPO_KEYS = [
+  'SLACK_WEBHOOK',
+  'DISCORD_WEBHOOK',
+  'GITHUB_TOKEN',
+  'WEBHOOK_URL',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_CHAT_ID',
+] as const
+
+function warnOnUnprefixedTypos(): void {
+  if (typeof process === 'undefined' || !process.env) return
+  for (const name of COMMON_TYPO_KEYS) {
+    const unprefixed = process.env[name]
+    const prefixed = process.env[`SNAPFEED_${name}`]
+    if (unprefixed && unprefixed.length > 0 && (!prefixed || prefixed.length === 0)) {
+      console.warn(
+        `[snapfeed] Did you mean SNAPFEED_${name}? Found ${name} but snapfeed only reads SNAPFEED_-prefixed env vars.`
+      )
+    }
+  }
 }
 
 /**
@@ -69,6 +98,10 @@ function readEnv(key: string): string | undefined {
  * warning via `console.warn`.
  */
 export function autoAdapters(): FeedbackAdapter[] {
+  // Surface common prefix-typos before doing anything else, so the warning
+  // shows up alongside whatever decision the rest of the function makes.
+  warnOnUnprefixedTypos()
+
   const adapters: FeedbackAdapter[] = []
 
   const slackWebhook = readEnv(AutoEnvKeys.SLACK_WEBHOOK)
@@ -86,14 +119,24 @@ export function autoAdapters(): FeedbackAdapter[] {
 
   const discordWebhook = readEnv(AutoEnvKeys.DISCORD_WEBHOOK)
   if (discordWebhook) {
-    adapters.push(discordAdapter({ webhookUrl: discordWebhook }))
+    const mentionRoleId = readEnv(AutoEnvKeys.DISCORD_MENTION_ROLE)
+    adapters.push(
+      discordAdapter({
+        webhookUrl: discordWebhook,
+        ...(mentionRoleId ? { mentionRoleId } : {}),
+      })
+    )
   }
 
   const githubToken = readEnv(AutoEnvKeys.GITHUB_TOKEN)
   const githubRepo = readEnv(AutoEnvKeys.GITHUB_REPO)
   if (githubToken && githubRepo) {
-    const [owner, repo] = githubRepo.split('/')
-    if (owner && repo) {
+    // Strict validation: must be exactly "owner/repo". Silently dropping extra
+    // segments (e.g. `owner/repo/extra`) hides the misconfiguration from the
+    // user and risks creating issues against the wrong repo.
+    const parts = githubRepo.split('/')
+    const [owner, repo] = parts
+    if (parts.length === 2 && owner && repo) {
       adapters.push(
         githubAdapter({
           token: githubToken,

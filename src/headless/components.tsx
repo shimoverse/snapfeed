@@ -128,11 +128,15 @@ export interface FeedbackModalProps {
  * shell with sensible defaults; consumers compose form pieces inside it.
  *
  * ESC closes the modal (calls `onClose` if provided, else the context
- * `close()`). Click on the overlay closes too.
+ * `close()`). Click on the overlay closes too. Focus is trapped within the
+ * modal while open; previously-focused element is restored on close.
  */
 export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
   const { state, close } = useFeedbackWidget()
   const components = useFeedbackComponents()
+  const titleId = React.useId()
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const prevFocusRef = React.useRef<HTMLElement | null>(null)
 
   // Always close the modal. The consumer's `onClose` callback is for THEIR
   // side-effects (analytics, logging) — it does NOT replace the close
@@ -146,20 +150,78 @@ export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
     }
   }, [props, close])
 
-  // ESC handler — only attached when the modal is mounted, removed on close.
+  // Treat success/idle as "not visible" — success has its own brief flash
+  // handled by FeedbackSuccess.
+  const visible = state === 'open' || state === 'submitting' || state === 'error'
+  const submitting = state === 'submitting'
+
+  // ESC + Tab focus-trap handler — only attached when the modal is mounted.
   React.useEffect(() => {
-    if (state !== 'open' && state !== 'submitting' && state !== 'error') return
+    if (!visible) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        // Don't allow ESC to dismiss while a submit is in flight.
+        if (submitting) return
+        onClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        const root = panelRef.current
+        if (!root) return
+        const focusables = getFocusableInside(root)
+        if (focusables.length === 0) {
+          e.preventDefault()
+          return
+        }
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (!first || !last) return
+        const active = document.activeElement as HTMLElement | null
+        if (e.shiftKey) {
+          if (active === first || !root.contains(active)) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (active === last || !root.contains(active)) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      }
     }
     if (typeof document === 'undefined') return undefined
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [state, onClose])
+  }, [visible, submitting, onClose])
 
-  // Treat success/idle as "not visible" — success has its own brief flash
-  // handled by FeedbackSuccess.
-  const visible = state === 'open' || state === 'submitting' || state === 'error'
+  // Capture focus on open, restore on close. Defer the focus call so the
+  // panel is mounted before we try to focus inside it.
+  React.useEffect(() => {
+    if (!visible) {
+      const prev = prevFocusRef.current
+      prevFocusRef.current = null
+      if (prev && typeof prev.focus === 'function') {
+        try {
+          prev.focus()
+        } catch {
+          /* ignore */
+        }
+      }
+      return undefined
+    }
+    if (typeof document !== 'undefined') {
+      prevFocusRef.current = document.activeElement as HTMLElement | null
+    }
+    const id = window.setTimeout(() => {
+      const root = panelRef.current
+      if (!root) return
+      const focusables = getFocusableInside(root)
+      ;(focusables[0] ?? root).focus()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [visible])
+
   if (!visible) return null
 
   if (components.Modal) {
@@ -169,9 +231,8 @@ export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
       onClick={e => {
+        if (submitting) return
         if (e.target === e.currentTarget) onClose()
       }}
       style={{
@@ -186,6 +247,11 @@ export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
       }}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={props.className}
         onClick={e => e.stopPropagation()}
         style={{
@@ -197,13 +263,57 @@ export function FeedbackModal(props: FeedbackModalProps): JSX.Element | null {
           width: '100%',
           maxWidth: '420px',
           fontFamily: 'var(--snapfeed-font-body)',
+          outline: 'none',
           ...props.style,
         }}
       >
+        {/* Visually-hidden anchor for aria-labelledby. Consumers compose
+            their own visible heading; this gives screen readers a stable
+            accessible name even when no <h1>/<h2> is provided. */}
+        <span id={titleId} style={visuallyHiddenStyle}>
+          Feedback
+        </span>
         {props.children}
       </div>
     </div>
   )
+}
+
+// ─── A11y helpers (shared by FeedbackModal + FeedbackTextarea) ───────────────
+
+const visuallyHiddenStyle: React.CSSProperties = {
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+}
+
+function getFocusableInside(root: HTMLElement): HTMLElement[] {
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+    'audio[controls]',
+    'video[controls]',
+    '[contenteditable]:not([contenteditable="false"])',
+  ].join(',')
+  const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector))
+  return nodes.filter(el => {
+    if (el.hasAttribute('disabled')) return false
+    if (el.getAttribute('aria-hidden') === 'true') return false
+    if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') {
+      return false
+    }
+    return true
+  })
 }
 
 // ─── FeedbackTextarea ────────────────────────────────────────────────────────
@@ -214,11 +324,20 @@ export interface FeedbackTextareaProps {
   className?: string
   style?: React.CSSProperties
   autoFocus?: boolean
+  /**
+   * Accessible label for the textarea. Rendered visually-hidden by default
+   * so screen-reader users get a name without affecting visible layout.
+   * Pass `null` to opt out (e.g. when you've wired your own visible
+   * <label htmlFor> outside this component).
+   * @default 'Feedback'
+   */
+  label?: string | null
 }
 
 export function FeedbackTextarea(props: FeedbackTextareaProps): JSX.Element {
   const { form } = useFeedbackWidget()
   const components = useFeedbackComponents()
+  const textareaId = React.useId()
 
   if (components.Textarea) {
     const Custom = components.Textarea
@@ -231,29 +350,41 @@ export function FeedbackTextarea(props: FeedbackTextareaProps): JSX.Element {
     )
   }
 
+  // `label === null` is the explicit opt-out; `undefined` falls back to
+  // the default 'Feedback'. Placeholder text alone fails WCAG 1.3.1.
+  const label = props.label === undefined ? 'Feedback' : props.label
+
   return (
-    <textarea
-      autoFocus={props.autoFocus}
-      value={form.text}
-      onChange={e => form.setText(e.target.value)}
-      placeholder={props.placeholder ?? 'What would you like to share?'}
-      rows={props.rows ?? 4}
-      className={props.className}
-      style={{
-        width: '100%',
-        resize: 'vertical',
-        border: '1px solid var(--snapfeed-color-border)',
-        borderRadius: 'var(--snapfeed-radius-md)',
-        padding: 'var(--snapfeed-spacing-md)',
-        fontFamily: 'var(--snapfeed-font-body)',
-        fontSize: 'var(--snapfeed-font-size-md)',
-        color: 'var(--snapfeed-color-foreground)',
-        background: 'var(--snapfeed-color-surface)',
-        outline: 'none',
-        boxSizing: 'border-box',
-        ...props.style,
-      }}
-    />
+    <>
+      {label !== null && (
+        <label htmlFor={textareaId} style={visuallyHiddenStyle}>
+          {label}
+        </label>
+      )}
+      <textarea
+        id={textareaId}
+        autoFocus={props.autoFocus}
+        value={form.text}
+        onChange={e => form.setText(e.target.value)}
+        placeholder={props.placeholder ?? 'What would you like to share?'}
+        rows={props.rows ?? 4}
+        className={props.className}
+        style={{
+          width: '100%',
+          resize: 'vertical',
+          border: '1px solid var(--snapfeed-color-border)',
+          borderRadius: 'var(--snapfeed-radius-md)',
+          padding: 'var(--snapfeed-spacing-md)',
+          fontFamily: 'var(--snapfeed-font-body)',
+          fontSize: 'var(--snapfeed-font-size-md)',
+          color: 'var(--snapfeed-color-foreground)',
+          background: 'var(--snapfeed-color-surface)',
+          outline: 'none',
+          boxSizing: 'border-box',
+          ...props.style,
+        }}
+      />
+    </>
   )
 }
 

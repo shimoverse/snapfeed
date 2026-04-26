@@ -10,7 +10,10 @@ import type { FeedbackHandlerConfig, FeedbackPayload, RateLimitStore } from '../
 // ─── Cross-runtime UTF-8 byte length ─────────────────────────────────────────
 // Vercel Edge, Cloudflare Workers, Deno, and browsers do not expose `Buffer`
 // as a global. Prefer `TextEncoder` (a Web Platform standard available
-// everywhere modern), and fall back to `Buffer` only when it exists (Node).
+// everywhere modern; baseline since Node 11), and fall back to `Buffer` only
+// when it exists (Node). The third "char-length" fallback was removed because
+// any runtime without TextEncoder OR Buffer in 2026 is purely hypothetical,
+// and silently under-validating size limits would be a security footgun.
 function utf8ByteLength(input: string): number {
   if (typeof TextEncoder !== 'undefined') {
     return new TextEncoder().encode(input).length
@@ -18,9 +21,7 @@ function utf8ByteLength(input: string): number {
   if (typeof Buffer !== 'undefined') {
     return Buffer.byteLength(input, 'utf8')
   }
-  // Last-resort approximation: 1 byte per char. Only reached on truly exotic
-  // runtimes; we'd rather under-validate than throw.
-  return input.length
+  throw new Error('utf8ByteLength requires TextEncoder or Buffer')
 }
 
 // ─── In-memory rate limit store (single instance) ────────────────────────────
@@ -123,9 +124,11 @@ export function validatePayload(
     return { valid: false, error: 'Feedback text is required' }
   }
 
-  // Text length hard cap (64KB absolute max, configurable soft cap)
-  if (payload.text.length > 64_000) {
-    return { valid: false, error: 'Feedback text is too long (max 64,000 characters)' }
+  // Text length hard cap (64KB absolute max, configurable soft cap).
+  // Uses UTF-8 byte length, not JS string length: a string of 64,000 4-byte
+  // emoji is 256,000 UTF-8 bytes, which we don't want to accept.
+  if (utf8ByteLength(payload.text) > 64_000) {
+    return { valid: false, error: 'Feedback text is too long (max 64,000 bytes)' }
   }
 
   // Payload size check (text + metadata, not screenshot)
@@ -209,17 +212,19 @@ export function normalizePayload(body: unknown): FeedbackPayload {
 // ─── Secret sanitizer ─────────────────────────────────────────────────────────
 
 const SECRET_PATTERNS = [
-  /token[=:\s]+\S+/gi,
-  /key[=:\s]+\S+/gi,
-  /secret[=:\s]+\S+/gi,
-  /password[=:\s]+\S+/gi,
-  /bearer\s+\S+/gi,
-  /authorization[=:\s]+\S+/gi,
+  // Combined alternation with word boundaries so "monkey patched" doesn't
+  // get mauled by a naive `key[=:\s]+...` match. Each trigger word must be
+  // a whole word followed by `=`/`:`/whitespace and a non-empty value.
+  /\b(?:token|key|secret|password|bearer|authorization)\b[=:\s]+\S+/gi,
   // JWT pattern
   /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g,
 ]
 
-function sanitizeConsoleError(error: string): string {
+// Exported so tests can pin the SECRET_PATTERNS list against the LLM-side
+// `redactForLLM` (the two are deliberately duplicated — `llm/redact.ts`
+// must stay self-contained for air-gapped bundling — but they should
+// redact the same canonical secret shapes).
+export function sanitizeConsoleError(error: string): string {
   let sanitized = error
   for (const pattern of SECRET_PATTERNS) {
     sanitized = sanitized.replace(pattern, '[REDACTED]')

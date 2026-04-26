@@ -214,7 +214,9 @@ export function clickUpAdapter(options: ClickUpAdapterOptions): FeedbackAdapter 
           }
         }
 
-        const created = (await createRes.json()) as { id?: string }
+        // Guard against malformed 2xx bodies — fall through to the missing-id
+        // check below rather than crashing the adapter on a JSON parse error.
+        const created = (await createRes.json().catch(() => ({}))) as { id?: string }
         const taskId = created.id
         if (!taskId) {
           return {

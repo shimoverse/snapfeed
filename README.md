@@ -28,18 +28,42 @@ Same widget. Different backend topology. Pick based on what your IT will approve
 ```bash
 npm install snapfeed
 npx snapfeed init --yes
+```
+
+Then wrap your root layout (this is the one step the CLI can't do for you):
+
+```tsx
+// app/layout.tsx (Next.js App Router) — or your equivalent root component
+import { FeedbackProvider } from 'snapfeed'
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <FeedbackProvider appName="My App">{children}</FeedbackProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+For Next.js App Router, the FeedbackProvider needs to live in a `'use client'` component — the CLI scaffolds `app/snapfeed-client.tsx` for you; just import it into your layout.
+
+```bash
 npm run dev
 ```
 
-Press **Ctrl+Shift+F**. Feedback dumps to `./feedback.jsonl` and your browser console. No env vars, no adapters, no signup.
+Press **Ctrl+Shift+F** (Cmd+Shift+F on Mac). Feedback dumps to `./feedback.jsonl` and your browser console. No env vars, no adapters, no signup.
 
-When you're ready to wire a real destination:
+**Wire a real destination — one env var, then restart `npm run dev`:**
 
 ```bash
 echo 'SNAPFEED_SLACK_WEBHOOK=https://hooks.slack.com/...' >> .env.local
 ```
 
-Restart. Done. The auto-adapter detects the env var and routes there.
+> Need a Slack webhook URL? https://api.slack.com/messaging/webhooks (5 steps).
+
+The auto-adapter detects `SNAPFEED_*` env vars and wires them. **Note**: only the `SNAPFEED_`-prefixed names are read; `SLACK_WEBHOOK` (without the prefix) is silently ignored.
 
 ## What it does (the customer journey)
 
@@ -142,15 +166,48 @@ import { FeedbackProvider } from 'snapfeed'
 <FeedbackProvider
   appName="Checkout"
   user={{ name: 'Ananya', email: 'ananya@company.com' }}
-  buildId={process.env.BUILD_ID}
-  gitSha={process.env.GIT_SHA}
-  env={process.env.NODE_ENV}
 >
   {children}
 </FeedbackProvider>
 ```
 
-> `buildId`, `gitSha`, `env` props remain planned. Today, pass build context inside `user` or via your own metadata layer; first-class top-level props land in **v0.5** alongside the SSO admin work.
+### Attaching build context (gitSha, buildId, env, feature flags)
+
+Use the `metadata.custom` field on every payload — that's the sanctioned extension seam until first-class props land. The receiver sees these in adapter destinations and the audit log.
+
+```tsx
+<FeedbackProvider
+  appName="Checkout"
+  user={{ name: user?.name, email: user?.email }}
+  // The provider doesn't have first-class buildId/gitSha props yet (planned for v0.6).
+  // Pass via `metadata.custom` on submit using the onReceive hook in your handler,
+  // or set them as data-* attributes you read in your own onReceive callback:
+  onSuccess={(payload) => console.log('sent', payload)}
+>
+  {children}
+</FeedbackProvider>
+```
+
+Server-side, you can read them in your handler's `onReceive`:
+
+```ts
+createFeedbackHandler({
+  adapters: autoAdapters(),
+  onReceive: async (payload) => {
+    payload.metadata = {
+      ...payload.metadata!,
+      custom: {
+        buildId: process.env.BUILD_ID ?? 'unknown',
+        gitSha: process.env.GIT_SHA ?? 'unknown',
+        env: process.env.NODE_ENV ?? 'development',
+      },
+    }
+    return true
+  },
+})
+```
+
+First-class top-level props (`buildId`, `gitSha`, `env`) ship in **v0.6**.
 
 ### Routing config
 
@@ -248,7 +305,10 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for adapter guidelines and the test har
 | Env var | Adapter |
 |---------|---------|
 | `SNAPFEED_SLACK_WEBHOOK` | Slack |
+| `SNAPFEED_SLACK_USERNAME` (optional) | Slack — bot username override |
+| `SNAPFEED_SLACK_CHANNEL` (optional) | Slack — channel override |
 | `SNAPFEED_DISCORD_WEBHOOK` | Discord |
+| `SNAPFEED_DISCORD_MENTION_ROLE` (optional) | Discord — role to @mention on each post |
 | `SNAPFEED_GITHUB_TOKEN` + `SNAPFEED_GITHUB_REPO` | GitHub Issues (`owner/repo`) |
 | `SNAPFEED_TELEGRAM_BOT_TOKEN` + `SNAPFEED_TELEGRAM_CHAT_ID` | Telegram |
 | `SNAPFEED_WEBHOOK_URL` | Generic webhook |
@@ -270,11 +330,12 @@ Threat model: "don't let our own widget become the leak." Defaults reflect that.
 
 ## Customization
 
-Three levels — pick the one that matches your time budget:
+Four levels — pick the one that matches your time budget:
 
 1. **Theme via CSS variables** (5 min) — override `--snapfeed-color-accent` etc. in your stylesheet
 2. **Compound components** (30 min) — `<FeedbackTrigger>`, `<FeedbackModal>`, `<FeedbackTextarea>` etc. from `snapfeed/headless`; bring your own design system
-3. **Headless render-prop** (full control) — `<FeedbackHeadless>{state => <YourUI />}</FeedbackHeadless>`
+3. **Slot swap** (15 min per slot) — replace one piece (e.g. textarea) via `<FeedbackComponentsProvider>` while keeping the rest of the default UI
+4. **Headless render-prop** (full control) — `<FeedbackHeadless>{state => <YourUI />}</FeedbackHeadless>`
 
 ```tsx
 import { extendTheme, themeToCss, lightTheme } from 'snapfeed/theme'
@@ -292,7 +353,7 @@ See [docs/customization.md](./docs/customization.md) for the full guide and Tail
 | Quickstart guides (6 personas) | [docs/quickstart/](./docs/quickstart/index.md) |
 | Full reference manual | [docs/MANUAL.md](./docs/MANUAL.md) |
 | Adoption playbook (30/60/90 day) | [docs/PLAYBOOK.md](./docs/PLAYBOOK.md) |
-| Customization (3 levels) | [docs/customization.md](./docs/customization.md) |
+| Customization (4 levels) | [docs/customization.md](./docs/customization.md) |
 | Architecture + Mermaid diagrams | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Product requirements (PRD) | [docs/PRD.md](./docs/PRD.md) |
 | Security policy + review checklist | [SECURITY.md](./SECURITY.md) |

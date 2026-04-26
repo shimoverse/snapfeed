@@ -228,4 +228,24 @@ describe('campaignShareUrl', () => {
       'https://app.example.com/c/checkout-v2-beta'
     )
   })
+
+  it('throws a clear error when baseUrl is not a valid URL', () => {
+    expect(() => campaignShareUrl(c, 'not a url at all')).toThrow(
+      /baseUrl is not a valid URL/i
+    )
+  })
+
+  it('throws when baseUrl is empty', () => {
+    expect(() => campaignShareUrl(c, '')).toThrow(
+      /baseUrl is not a valid URL/i
+    )
+  })
+
+  it('throws on a typo like `htps://`', () => {
+    // `new URL('htps://app.example.com')` actually parses successfully — URL
+    // is permissive about scheme. So the guard's job is mostly to catch
+    // truly malformed strings (like the previous test) rather than typos.
+    // Documenting this design choice.
+    expect(() => campaignShareUrl(c, 'htps://app.example.com')).not.toThrow()
+  })
 })

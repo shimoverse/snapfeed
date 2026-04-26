@@ -5,7 +5,7 @@
  * we cover the express path which has identical request-lifecycle semantics.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { feedbackMiddleware } from '../../src/server/express'
 import type {
   FeedbackAdapter,
@@ -317,6 +317,216 @@ describe('feedbackMiddleware — rate limit', () => {
 })
 
 // ─── Unicode (UTF-8 byte counting) ───────────────────────────────────────────
+
+// ─── Production allowedOrigins warning ──────────────────────────────────────
+
+describe('feedbackMiddleware — production allowedOrigins warning', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>
+  let originalEnv: string | undefined
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    originalEnv = process.env.NODE_ENV
+  })
+
+  afterEach(() => {
+    warnSpy.mockRestore()
+    if (originalEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalEnv
+  })
+
+  it('warns ONCE at construction when NODE_ENV=production and allowedOrigins is undefined', () => {
+    process.env.NODE_ENV = 'production'
+    feedbackMiddleware({ adapters: [okAdapter()] })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy.mock.calls[0]![0]).toMatch(/allowedOrigins is empty in production/i)
+  })
+
+  it('warns when NODE_ENV=production and allowedOrigins is an empty array', () => {
+    process.env.NODE_ENV = 'production'
+    feedbackMiddleware({ adapters: [okAdapter()], allowedOrigins: [] })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT warn when NODE_ENV=production and allowedOrigins is non-empty', () => {
+    process.env.NODE_ENV = 'production'
+    feedbackMiddleware({
+      adapters: [okAdapter()],
+      allowedOrigins: ['https://app.example.com'],
+    })
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('does NOT warn when NODE_ENV is not production', () => {
+    process.env.NODE_ENV = 'development'
+    feedbackMiddleware({ adapters: [okAdapter()] })
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('warns once per handler instance (not per request)', async () => {
+    process.env.NODE_ENV = 'production'
+    const handler = feedbackMiddleware({ adapters: [okAdapter()] })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+
+    // Drive a few requests through; the warn count must not climb.
+    for (let i = 0; i < 3; i++) {
+      const req = makeReq({ body: basePayload() })
+      const res = makeRes()
+      await handler(req, res, vi.fn())
+    }
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─── express.json() upstream missing ────────────────────────────────────────
+
+describe('feedbackMiddleware — req.body undefined diagnostic', () => {
+  it('returns 500 with a clear hint when req.body is undefined', async () => {
+    const handler = feedbackMiddleware({ adapters: [okAdapter()] })
+    // Note: makeReq() with no `body` override leaves req.body === undefined.
+    const req = makeReq()
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+
+    expect(res._status).toBe(500)
+    expect((res._body as { error: string }).error).toMatch(/express\.json/i)
+  })
+
+  it('still validates normally when req.body is parsed (object)', async () => {
+    const handler = feedbackMiddleware({ adapters: [okAdapter()] })
+    const req = makeReq({ body: basePayload() })
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+    expect(res._status).toBe(200)
+  })
+
+  it('treats null body as 400 (validatePayload rejects), not 500', async () => {
+    const handler = feedbackMiddleware({ adapters: [okAdapter()] })
+    const req = makeReq({ body: null })
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+    // null !== undefined → passes the body-defined guard, then fails validation.
+    expect(res._status).toBe(400)
+  })
+})
+
+// ─── createFeedbackHandler dynamic import caching ───────────────────────────
+
+describe('createFeedbackHandler — next/server import caching', () => {
+  it('clear error when next/server is not installed', async () => {
+    // The Next.js handler itself dynamically imports `next/server`. In this
+    // test environment Next isn't installed, so we expect the wrapper to
+    // throw the friendly error rather than ERR_MODULE_NOT_FOUND.
+    const { createFeedbackHandler, __resetNextServerCacheForTesting } =
+      await import('../../src/server/nextjs')
+    __resetNextServerCacheForTesting()
+
+    const handler = createFeedbackHandler({ adapters: [okAdapter()] })
+    const fakeReq = {
+      json: async () => basePayload(),
+      headers: { get: () => null },
+    } as unknown as Parameters<typeof handler>[0]
+
+    await expect(handler(fakeReq)).rejects.toThrow(
+      /createFeedbackHandler requires Next\.js/i
+    )
+
+    // After failure the cache is reset so a second call also surfaces the
+    // friendly error (rather than a stale rejected promise).
+    await expect(handler(fakeReq)).rejects.toThrow(
+      /createFeedbackHandler requires Next\.js/i
+    )
+  })
+})
+
+// ─── Tightened SECRET_PATTERNS regex ───────────────────────────────────────
+
+describe('feedbackMiddleware — tightened secret regex', () => {
+  it('does NOT redact "monkey patched" (was a false positive on `key`)', async () => {
+    const adapter = okAdapter()
+    const captured: { errs?: string[] } = {}
+    adapter.send = vi.fn(async (payload) => {
+      captured.errs = payload.metadata?.consoleErrors
+      return { ok: true, deliveryId: 'd' }
+    })
+    const handler = feedbackMiddleware({ adapters: [adapter] })
+
+    const req = makeReq({
+      body: {
+        ...basePayload(),
+        metadata: {
+          viewport: '1x1',
+          userAgent: 'ua',
+          consoleErrors: ['fetch was monkey patched by analytics-sdk'],
+        },
+      },
+    })
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+
+    expect(res._status).toBe(200)
+    expect(captured.errs?.[0]).toBe('fetch was monkey patched by analytics-sdk')
+    expect(captured.errs?.[0]).not.toContain('[REDACTED]')
+  })
+
+  it('still redacts an actual `key=` secret (whole-word match)', async () => {
+    const adapter = okAdapter()
+    const captured: { errs?: string[] } = {}
+    adapter.send = vi.fn(async (payload) => {
+      captured.errs = payload.metadata?.consoleErrors
+      return { ok: true, deliveryId: 'd' }
+    })
+    const handler = feedbackMiddleware({ adapters: [adapter] })
+
+    const req = makeReq({
+      body: {
+        ...basePayload(),
+        metadata: {
+          viewport: '1x1',
+          userAgent: 'ua',
+          consoleErrors: ['401 from /v1?key=abc123XYZ-shh'],
+        },
+      },
+    })
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+
+    expect(captured.errs?.[0]).toContain('[REDACTED]')
+    expect(captured.errs?.[0]).not.toContain('abc123XYZ-shh')
+  })
+
+  it('still redacts `token=`, `secret=`, `bearer ...`', async () => {
+    const adapter = okAdapter()
+    const captured: { errs?: string[] } = {}
+    adapter.send = vi.fn(async (payload) => {
+      captured.errs = payload.metadata?.consoleErrors
+      return { ok: true, deliveryId: 'd' }
+    })
+    const handler = feedbackMiddleware({ adapters: [adapter] })
+
+    const req = makeReq({
+      body: {
+        ...basePayload(),
+        metadata: {
+          viewport: '1x1',
+          userAgent: 'ua',
+          consoleErrors: [
+            'callback ?token=tok123abc and secret=ssh-456',
+            'auth: bearer eyJabc.def.ghi',
+          ],
+        },
+      },
+    })
+    const res = makeRes()
+    await handler(req, res, vi.fn())
+
+    expect(captured.errs?.[0]).toContain('[REDACTED]')
+    expect(captured.errs?.[0]).not.toContain('tok123abc')
+    expect(captured.errs?.[0]).not.toContain('ssh-456')
+    expect(captured.errs?.[1]).toContain('[REDACTED]')
+    expect(captured.errs?.[1]).not.toContain('eyJabc.def.ghi')
+  })
+})
 
 describe('feedbackMiddleware — unicode payload byte counting', () => {
   it('emoji-laden text is sized in UTF-8 bytes (4 bytes per emoji), not chars', async () => {

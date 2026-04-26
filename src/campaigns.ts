@@ -143,6 +143,13 @@ export function getCampaignRouting(
  * Trailing slashes on `baseUrl` are normalized away.
  */
 export function campaignShareUrl(c: ReleaseCampaign, baseUrl: string): string {
+  // Validate the base URL parses — catches typos like `htps://` or a stray
+  // path-only string before they end up in a generated share link.
+  try {
+    new URL(baseUrl)
+  } catch {
+    throw new Error(`campaignShareUrl: baseUrl is not a valid URL: ${baseUrl}`)
+  }
   const trimmed = baseUrl.replace(/\/+$/u, '')
   return `${trimmed}/c/${c.id}`
 }

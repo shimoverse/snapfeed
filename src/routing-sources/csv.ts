@@ -65,6 +65,13 @@ export function csvRoutingSource(options: CsvRoutingSourceOptions): RoutingSourc
         return undefined
       }
 
+      // Strip a leading UTF-8 BOM (U+FEFF). Excel and many editors prepend
+      // one when saving CSV — without stripping, the first header (`match`)
+      // becomes "BOM+match" and the column-index lookup silently misses.
+      if (text.charCodeAt(0) === 0xfeff) {
+        text = text.slice(1)
+      }
+
       const rows = parseCsv(text)
       if (rows.length === 0) {
         return { routes: [] }

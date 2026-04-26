@@ -85,4 +85,17 @@ describe('consoleAdapter', () => {
     const result = await adapter.send(samplePayload)
     expect(result.ok).toBe(true)
   })
+
+  it('returns { ok: false } when console method throws (monkey-patched logger)', async () => {
+    // Defensive: a consumer who replaces console.log with a throwing function
+    // (sentry shims, custom log capture, etc.) must not crash the adapter
+    // pipeline. The adapter swallows the throw and reports it as an error.
+    vi.spyOn(console, 'log').mockImplementation(() => {
+      throw new Error('logger blew up')
+    })
+    const adapter = consoleAdapter()
+    const result = await adapter.send(samplePayload)
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('logger blew up')
+  })
 })

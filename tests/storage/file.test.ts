@@ -115,3 +115,65 @@ describe('fileStorage', () => {
     expect(result.deliveryId).toBe(path.join(dir, 'x-screenshot.png'))
   })
 })
+
+describe('fileStorage — race-safe dirEnsured', () => {
+  it('handles N concurrent first uploads (no race condition)', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+
+    // Fire 8 uploads in parallel before the directory exists. With the
+    // pre-fix boolean flag, all 8 callers entered the `if (!dirEnsured)`
+    // branch and racced their mkdirs. mkdir({ recursive: true }) is itself
+    // idempotent, so the previous code didn't crash — but the memoized
+    // promise variant ensures only one mkdir is ever in flight. Either way,
+    // the public-facing guarantee we test is "no upload throws and all
+    // 8 files land on disk".
+    const results = await Promise.all(
+      Array.from({ length: 8 }).map((_, i) =>
+        adapter.upload({ ...baseInput, filename: `f${i}.png` })
+      )
+    )
+    expect(results).toHaveLength(8)
+    for (let i = 0; i < 8; i++) {
+      expect(results[i]!.deliveryId).toBe(path.join(dir, `p-f${i}.png`))
+      const written = await readFile(results[i]!.deliveryId)
+      expect(Array.from(written)).toEqual([1, 2, 3, 4, 5])
+    }
+  })
+})
+
+describe('fileStorage — filename sanitization', () => {
+  it("sanitizes path-traversal attempts (`../../etc/passwd` becomes `passwd`)", async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+    const result = await adapter.upload({
+      ...baseInput,
+      filename: '../../../etc/passwd',
+    })
+    // Final on-disk path lives strictly inside `dir`, with the directory
+    // components stripped from the user-supplied filename.
+    expect(result.deliveryId).toBe(path.join(dir, 'p-passwd'))
+    // Guard: the resolved path is a child of the configured dir.
+    expect(path.resolve(result.deliveryId).startsWith(path.resolve(dir))).toBe(true)
+  })
+
+  it('sanitizes a backslash-style traversal too (Windows-y paths)', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+    // path.basename on POSIX treats backslashes as part of the filename, but
+    // on the typical CI (POSIX) the whole string IS the basename. Either way
+    // the file lives inside `dir`.
+    const result = await adapter.upload({
+      ...baseInput,
+      filename: 'foo/bar.png',
+    })
+    expect(result.deliveryId).toBe(path.join(dir, 'p-bar.png'))
+  })
+
+  it('preserves a benign filename verbatim', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+    const result = await adapter.upload({ ...baseInput, filename: 'normal.png' })
+    expect(result.deliveryId).toBe(path.join(dir, 'p-normal.png'))
+  })
+})

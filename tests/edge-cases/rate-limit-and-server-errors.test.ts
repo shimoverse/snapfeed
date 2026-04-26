@@ -53,6 +53,13 @@ type AdapterEntry = {
   build: () => { send: (p: FeedbackPayload) => Promise<{ ok: boolean; error?: string }> }
   /** Whether the adapter parses a 2xx JSON body on the create-call path. */
   parsesJsonOnSuccess: boolean
+  /**
+   * v0.5.2 hardening: adapters whose 2xx body parse failure should NOT crash
+   * the adapter but ALSO should not be reported as ok=false. These adapters
+   * return ok=true with a missing deliveryId on a malformed 2xx body
+   * (delivery succeeded; we just lost the id).
+   */
+  malformedJsonStaysOk?: boolean
 }
 
 const ADAPTERS: AdapterEntry[] = [
@@ -124,12 +131,17 @@ const ADAPTERS: AdapterEntry[] = [
     name: 'telegram',
     build: () => telegramAdapter({ botToken: 't', chatId: '123' }),
     parsesJsonOnSuccess: true,
+    // Text message succeeded (HTTP 200); a malformed body just costs us the
+    // message_id. Delivery is real — surfacing ok=true is correct.
+    malformedJsonStaysOk: true,
   },
   {
     name: 'github',
     build: () =>
       githubAdapter({ token: 'gh_pat', owner: 'org', repo: 'app' }),
     parsesJsonOnSuccess: true,
+    // Issue creation succeeded; a malformed body just costs us the issue number.
+    malformedJsonStaysOk: true,
   },
   {
     name: 'supabase',
@@ -139,11 +151,13 @@ const ADAPTERS: AdapterEntry[] = [
         anonKey: 'anon_key',
       }),
     parsesJsonOnSuccess: true,
+    // Insert succeeded; a malformed body just costs us the row id.
+    malformedJsonStaysOk: true,
   },
 ]
 
 describe('rate-limit-and-server-errors', () => {
-  for (const { name, build, parsesJsonOnSuccess } of ADAPTERS) {
+  for (const { name, build, parsesJsonOnSuccess, malformedJsonStaysOk } of ADAPTERS) {
     describe(`${name} server errors`, () => {
       it('returns ok=false on HTTP 429 (rate limited) with status code in error', async () => {
         fetchMock.mockResolvedValue(
@@ -186,7 +200,7 @@ describe('rate-limit-and-server-errors', () => {
       })
 
       if (parsesJsonOnSuccess) {
-        it('returns ok=false (does not throw) when 2xx body is truncated/invalid JSON', async () => {
+        it('does not throw when 2xx body is truncated/invalid JSON', async () => {
           fetchMock.mockResolvedValue(
             new Response('{"incomplete":', {
               status: 200,
@@ -195,11 +209,23 @@ describe('rate-limit-and-server-errors', () => {
           )
           const adapter = build()
 
-          // The adapter must catch the SyntaxError thrown by res.json() and
-          // surface it as ok=false; it must NOT propagate the throw.
+          // The adapter must catch the SyntaxError thrown by res.json().
+          // Two valid responses depending on adapter contract:
+          //   - ok=false with a "no <id>" error message (most adapters): the
+          //     create succeeded but we have no way to identify what was
+          //     created, so treat it as a soft failure.
+          //   - ok=true with a missing/empty deliveryId (telegram, github,
+          //     supabase): primary delivery is unambiguously real, the body
+          //     parse only cost us the id.
+          // Either is fine — the regression we guard against is an uncaught
+          // SyntaxError propagating to the caller.
           const r = await adapter.send(samplePayload)
-          expect(r.ok).toBe(false)
-          expect(r.error).toBeTruthy()
+          if (malformedJsonStaysOk) {
+            expect(r.ok).toBe(true)
+          } else {
+            expect(r.ok).toBe(false)
+            expect(r.error).toBeTruthy()
+          }
         })
       }
     })

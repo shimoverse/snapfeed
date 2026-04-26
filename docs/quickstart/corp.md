@@ -3,7 +3,7 @@
 **Persona:** Engineering, QA, or IT lead at a Fortune 500 or regulated industry (finance, healthcare, defense, gov). Strict security review. Data must not leave the VPC. Identity provider is Okta or Azure AD. Any LLM must be in-tenant (AWS Bedrock or Azure OpenAI in your subscription) — no third-party AI APIs.
 **Goal:** Air-gapped Docker install, in-tenant LLM, audit log shipped to your SIEM, JIRA + ServiceNow destinations, full security review checklist green.
 **Time budget:** 1–2 weeks total. Less than a day of actual install work; the rest is your security review cycle.
-**snapfeed version:** v0.4.0
+**snapfeed version:** v0.5.x
 
 This guide is sequenced as a **security-review-friendly path**, not "install first, ask forgiveness later." Steps 1–2 happen before any code lands in your network.
 
@@ -24,12 +24,20 @@ Before touching your internal Git mirror, hand your security team this set of fi
 - `docker/worker.cjs` — the entire HTTP server (zero runtime deps; ~300 lines)
 - `src/server/security.ts` — origin allowlist, rate limit, payload validation, console-error redaction
 
-Honest gaps to flag in your review packet:
+**Documents you can hand directly to your reviewer (all shipped):**
 
-- **No `THREAT_MODEL.md`** in the repo today. The threat posture is described in `SECURITY.md` ("don't let our own widget become the leak") and `PRIVACY.md`. If your reviewer requires a formal threat model document, you'll need to author one against the surface in `src/server/security.ts` and `docker/worker.cjs`.
-- **No `COMPLIANCE.md`** (SOC 2 / ISO / HIPAA mapping) in the repo. The library is MIT and stateless from a hosted-service standpoint — there is no provider to attest. Your install runs entirely inside your boundary; compliance attaches to your environment, not snapfeed.
-- **SBOM is planned for v0.5**, not shipped in v0.4. If your review requires an SBOM, generate one yourself: `npm sbom --sbom-format cyclonedx > snapfeed-sbom.json` after `npm install`.
+- `THREAT_MODEL.md` — assets, trust boundaries, threat actors, 12-row threat-mitigation table tied to `src/server/security.ts` and `src/llm/redact.ts`.
+- `COMPLIANCE.md` — GDPR / CCPA / HIPAA / SOC 2 / PCI / ISO / FedRAMP / Section 508 / data-residency posture, with a SOC 2 control-mapping table.
+- `docs/SECURITY_REPORT.md` — third-party-style audit deliverable with 13 numbered findings (1 dev-deps High, 2 Low — both fixed in v0.5.0+, 10 Info).
+- `docs/SECURE_DEPLOYMENT.md` — operator hardening guide (network, container, persistence, monitoring, backup, DR).
+- `legal/DPA-template.md` — Data Processing Addendum template.
+- `legal/THIRD_PARTY_NOTICES.md` — license + source for every optional/peer dependency.
+
+**Honest gaps still on the v0.6 roadmap:**
+
+- **SBOM is planned for v0.6**, not auto-published per release yet. Generate one yourself if your review requires it: `npm sbom --sbom-format cyclonedx > snapfeed-sbom.json` after `npm install`.
 - **Image digests are named tags, not pinned by sha256** in `docker/docker-compose.yml`. Pin yourself for reproducible builds (step 3).
+- **SSO/SAML for the admin app** is not built in. Front the admin app with oauth2-proxy / Pomerium / Cloudflare Access / IAP and forward `x-snapfeed-admin-user` (see `examples/admin/lib/auth.ts`).
 
 ## 2. Once approved: clone into your internal Git mirror, pin a tag
 

@@ -18,6 +18,9 @@ const detected = autoAdapters()
 const adapters =
   detected.length > 0 ? detected : [consoleAdapter()]
 
+// autoAdapters() never returns undefined; the fallback path is purely the
+// `length > 0` branch above. We log either side so operators can see what
+// they wired up at boot.
 if (detected.length === 0) {
   console.warn(
     '[snapfeed-example] No SNAPFEED_* env vars detected — falling back to consoleAdapter(). ' +
@@ -43,6 +46,12 @@ app.post(
   feedbackMiddleware({
     adapters,
     rateLimit: { max: 30, windowMs: 60_000 },
+    // In production, restrict to the deployed origin. In dev the Vite
+    // proxy forwards from 5173, so leaving this undefined is fine.
+    allowedOrigins:
+      process.env.NODE_ENV === 'production' && process.env.SITE_ORIGIN
+        ? [process.env.SITE_ORIGIN]
+        : undefined,
     onComplete(payload, results) {
       console.log(
         '[snapfeed-example] received feedback from',

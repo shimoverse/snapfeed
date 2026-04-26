@@ -14,7 +14,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "useDefineForClassFields": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

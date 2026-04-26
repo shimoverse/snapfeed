@@ -3,7 +3,7 @@
 **Persona:** Founder, PM, or early-stage engineer at a 5–50 person startup. Stack: Next.js, Slack, Linear, GitHub.
 **Goal:** Every piece of feedback fans out to Slack for awareness AND auto-creates a Linear issue. Routing rules send checkout-area feedback to the payments person and dashboard feedback to the platform person, so nothing sits in a generic queue.
 **Time budget:** 30 minutes (most of it is creating the Linear API key and finding your team ID).
-**snapfeed version:** v0.4.0
+**snapfeed version:** v0.5.x
 
 ---
 

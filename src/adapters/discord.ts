@@ -128,28 +128,50 @@ export function discordAdapter(options: DiscordAdapterOptions): FeedbackAdapter 
         embeds: [embed],
       }
 
+      const warnings: string[] = []
+
       try {
         let res: Response
+        let screenshotAttached = false
 
         if (payload.screenshot?.base64) {
-          const bytes = base64ToUint8Array(payload.screenshot.base64)
-          const ext = extensionForMime(payload.screenshot.mimeType)
-          const blob = new Blob([bytes as BlobPart], { type: payload.screenshot.mimeType })
+          // Wrapped so a malformed base64 (atob throws) does not abort the
+          // whole post — fall back to the JSON-only path and surface a warning.
+          try {
+            const bytes = base64ToUint8Array(payload.screenshot.base64)
+            const ext = extensionForMime(payload.screenshot.mimeType)
+            const blob = new Blob([bytes as BlobPart], { type: payload.screenshot.mimeType })
 
-          // Reference the file from the embed so Discord renders it inline.
-          ;(embed as { image?: { url: string } }).image = { url: `attachment://screenshot.${ext}` }
+            // Reference the file from the embed so Discord renders it inline.
+            ;(embed as { image?: { url: string } }).image = { url: `attachment://screenshot.${ext}` }
 
-          const form = new FormData()
-          form.append('payload_json', JSON.stringify(jsonPayload))
-          form.append('files[0]', blob, `screenshot.${ext}`)
+            const form = new FormData()
+            form.append('payload_json', JSON.stringify(jsonPayload))
+            form.append('files[0]', blob, `screenshot.${ext}`)
 
-          // Append ?wait=true so Discord returns the created message JSON
-          // (otherwise it 204s with no body and we lose the message id).
-          const url = webhookUrl.includes('?')
-            ? `${webhookUrl}&wait=true`
-            : `${webhookUrl}?wait=true`
+            // Append ?wait=true so Discord returns the created message JSON
+            // (otherwise it 204s with no body and we lose the message id).
+            const url = webhookUrl.includes('?')
+              ? `${webhookUrl}&wait=true`
+              : `${webhookUrl}?wait=true`
 
-          res = await fetch(url, { method: 'POST', body: form })
+            res = await fetch(url, { method: 'POST', body: form })
+            screenshotAttached = true
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err)
+            warnings.push(`screenshot upload failed: ${detail}`)
+            // Drop the embed image reference (we never attached the file).
+            delete (embed as { image?: { url: string } }).image
+
+            const url = webhookUrl.includes('?')
+              ? `${webhookUrl}&wait=true`
+              : `${webhookUrl}?wait=true`
+            res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(jsonPayload),
+            })
+          }
         } else {
           const url = webhookUrl.includes('?')
             ? `${webhookUrl}&wait=true`
@@ -174,14 +196,21 @@ export function discordAdapter(options: DiscordAdapterOptions): FeedbackAdapter 
         try {
           const ct = res.headers.get('content-type') ?? ''
           if (ct.includes('application/json')) {
-            const data = (await res.json()) as { id?: string }
+            // Guard against malformed 2xx bodies — a parse failure should not
+            // turn a successful delivery into an error.
+            const data = (await res.json().catch(() => ({}))) as { id?: string }
             if (data?.id) deliveryId = data.id
           }
         } catch {
           // Non-JSON (204 No Content) — keep default deliveryId.
         }
 
-        return { ok: true, deliveryId }
+        // Suppress unused-var warning in environments where TS is strict.
+        void screenshotAttached
+
+        return warnings.length > 0
+          ? { ok: true, deliveryId, warnings }
+          : { ok: true, deliveryId }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         return { ok: false, error: `Discord adapter error: ${message}` }

@@ -196,6 +196,43 @@ describe('s3Storage key + URL overrides', () => {
   })
 })
 
+describe('s3Storage construction validation', () => {
+  it('throws if endpoint host already starts with `${bucket}.`', () => {
+    expect(() =>
+      s3Storage({
+        ...baseOpts,
+        bucket: 'my-bucket',
+        // User mistake: pre-baked the bucket into the endpoint host. Without
+        // the guard, buildUrl would produce my-bucket.my-bucket.host and
+        // every PUT would 404 with an opaque signing-mismatch error.
+        endpoint: 'https://my-bucket.s3.us-east-1.amazonaws.com',
+      })
+    ).toThrow(/endpoint must not include the bucket name/i)
+  })
+
+  it('accepts an endpoint whose host has the bucket name as a SUFFIX (no false positive)', () => {
+    // e.g. another-bucket.s3.amazonaws.com should NOT trip the guard for
+    // bucket=`bucket`. Only a leading `${bucket}.` is rejected.
+    expect(() =>
+      s3Storage({
+        ...baseOpts,
+        bucket: 'bucket',
+        endpoint: 'https://another-bucket.s3.us-east-1.amazonaws.com',
+      })
+    ).not.toThrow()
+  })
+
+  it('throws a clear error when endpoint is not a valid URL', () => {
+    expect(() =>
+      s3Storage({ ...baseOpts, endpoint: 'not a url at all' })
+    ).toThrow(/not a valid URL/i)
+  })
+
+  it('does not throw when endpoint is omitted (AWS default)', () => {
+    expect(() => s3Storage(baseOpts)).not.toThrow()
+  })
+})
+
 describe('s3Storage error handling', () => {
   it('throws an Error containing the status and truncated body on non-2xx', async () => {
     stubFetch({

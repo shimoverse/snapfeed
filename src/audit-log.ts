@@ -110,10 +110,16 @@ export function fileAuditLog(options: FileAuditLogOptions = {}): AuditLog {
 
   return {
     async record(event: AuditEvent): Promise<void> {
-      const toWrite = hashReporter ? await redactReporter(event) : event
-      await ensureDir()
-      const { appendFile } = await import('node:fs/promises')
-      await appendFile(filePath, JSON.stringify(toWrite) + '\n', 'utf8')
+      // Audit failures must NEVER break the request flow. Wrap the entire
+      // write path in try/catch and surface failures via console.error only.
+      try {
+        const toWrite = hashReporter ? await redactReporter(event) : event
+        await ensureDir()
+        const { appendFile } = await import('node:fs/promises')
+        await appendFile(filePath, JSON.stringify(toWrite) + '\n', 'utf8')
+      } catch (err) {
+        console.error('[snapfeed] audit-log write failed:', err)
+      }
     },
   }
 }
