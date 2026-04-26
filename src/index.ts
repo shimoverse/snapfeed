@@ -47,6 +47,15 @@ export type { RoutingConfig, RoutingRule, RoutingDestination } from './routing'
 // ─── Screenshot utilities ─────────────────────────────────────────────────────
 export { captureScreenshot, fileToScreenshot, extractImageFromClipboard } from './screenshot'
 
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
+// Pure data; safe to import in any environment. Power-users who want only
+// the theme can also import from `snapfeed/theme`.
+export { lightTheme, darkTheme, themeToCss, extendTheme } from './theme'
+export type { SnapfeedTheme, DeepPartial } from './theme'
+
+// Headless API — see `snapfeed/headless` for the customization surface
+// (compound components, render-prop, slot-swap provider).
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type {
   FeedbackPayload,

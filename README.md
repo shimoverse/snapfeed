@@ -21,6 +21,8 @@ Not an end-customer feedback widget. If you want a public "tell us what you thin
 
 Same widget. Different backend topology. Pick based on what your IT will approve.
 
+**Per-persona quickstart guides** (5 min → 1 hour, copy-paste runnable): see [docs/quickstart/](./docs/quickstart/index.md) for indie, startup, mid-size, corp, OSS-maintainer, and designer walkthroughs.
+
 ## 60-second quickstart (zero config)
 
 ```bash
@@ -264,7 +266,47 @@ Threat model: "don't let our own widget become the leak." Defaults reflect that.
 - LLM optional, BYOK only — never proxied through us
 - Console-error sanitization strips tokens / keys / JWTs before transit
 - Origin allowlist, payload caps, rate limit on the server handler
-- See [SECURITY.md](./SECURITY.md) for the corporate review checklist
+- See [SECURITY.md](./SECURITY.md), [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/SECURITY_REPORT.md](./docs/SECURITY_REPORT.md), and [docs/SECURE_DEPLOYMENT.md](./docs/SECURE_DEPLOYMENT.md)
+
+## Customization
+
+Three levels — pick the one that matches your time budget:
+
+1. **Theme via CSS variables** (5 min) — override `--snapfeed-color-accent` etc. in your stylesheet
+2. **Compound components** (30 min) — `<FeedbackTrigger>`, `<FeedbackModal>`, `<FeedbackTextarea>` etc. from `snapfeed/headless`; bring your own design system
+3. **Headless render-prop** (full control) — `<FeedbackHeadless>{state => <YourUI />}</FeedbackHeadless>`
+
+```tsx
+import { extendTheme, themeToCss, lightTheme } from 'snapfeed/theme'
+
+const myTheme = extendTheme(lightTheme, { colors: { accent: '#7c3aed' } })
+// drop themeToCss(myTheme) into a <style> block
+```
+
+See [docs/customization.md](./docs/customization.md) for the full guide and Tailwind / shadcn / Material-UI integration recipes.
+
+## Documentation
+
+| | |
+|---|---|
+| Quickstart guides (6 personas) | [docs/quickstart/](./docs/quickstart/index.md) |
+| Full reference manual | [docs/MANUAL.md](./docs/MANUAL.md) |
+| Adoption playbook (30/60/90 day) | [docs/PLAYBOOK.md](./docs/PLAYBOOK.md) |
+| Customization (3 levels) | [docs/customization.md](./docs/customization.md) |
+| Architecture + Mermaid diagrams | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| Product requirements (PRD) | [docs/PRD.md](./docs/PRD.md) |
+| Security policy + review checklist | [SECURITY.md](./SECURITY.md) |
+| Threat model | [THREAT_MODEL.md](./THREAT_MODEL.md) |
+| Audit-style security report | [docs/SECURITY_REPORT.md](./docs/SECURITY_REPORT.md) |
+| Operator hardening guide | [docs/SECURE_DEPLOYMENT.md](./docs/SECURE_DEPLOYMENT.md) |
+| Privacy posture | [PRIVACY.md](./PRIVACY.md) |
+| Compliance (GDPR / SOC 2 / HIPAA / etc.) | [COMPLIANCE.md](./COMPLIANCE.md) |
+| Browser / Node / framework support | [COMPATIBILITY.md](./COMPATIBILITY.md) |
+| Versioning policy | [VERSIONING.md](./VERSIONING.md) |
+| Release process | [RELEASE.md](./RELEASE.md) |
+| Getting help | [SUPPORT.md](./SUPPORT.md) |
+| DPA template | [legal/DPA-template.md](./legal/DPA-template.md) |
+| Third-party notices | [legal/THIRD_PARTY_NOTICES.md](./legal/THIRD_PARTY_NOTICES.md) |
 
 ## Production safety
 
@@ -285,13 +327,17 @@ Threat model: "don't let our own widget become the leak." Defaults reflect that.
 | Phase | Cut as | Highlights |
 |-------|--------|------------|
 | v0.3 | shipped | Hygiene, file/auto/jira/linear/sheets/discord adapters, routing config, CLI, runnable Next.js example |
-| v0.4 (this release) | now | MS Teams / Asana / ClickUp / Notion adapters; LLM (BYOK — Anthropic, OpenAI, Azure, Bedrock, Ollama); voice capture; screen recording; storage adapters (file, S3-compatible); spreadsheet-backed routing source (Sheets, CSV); audit log; network capture; Release Campaigns; Docker compose self-host stack; admin Next.js viewer |
-| v0.5 |  | Docker compose stack, admin UI (embed + standalone), SSO/SAML, full air-gapped install guide |
-| v1.0 |  | React Native SDK, screen recording rewind, network log capture, Release Campaigns, Vue/Svelte clients |
+| v0.4 | shipped | MS Teams / Asana / ClickUp / Notion adapters; LLM (BYOK — Anthropic, OpenAI, Azure, Ollama); voice capture; screen recording; storage adapters (file, S3-compatible); spreadsheet-backed routing source (Sheets, CSV); audit log; network capture; Release Campaigns; Docker compose self-host stack; minimal admin viewer |
+| v0.5 (this release) | now | UI customization layer (`snapfeed/theme` + `snapfeed/headless`); admin dashboard upgrade (filters, bulk actions, dashboard view, audit view, saved views); full doc pack (PRD, Playbook, Manual, Architecture, Security Report, Hardening guide, 6 persona quickstarts); ESLint + Prettier + size-limit; Vite + Remix examples; F-002 / F-003 fixed |
+| v0.6 |  | Postgres-backed inbox + admin write-back; first-class `buildId`/`gitSha`/`env` provider props; built-in OIDC for admin; image-digest pinning; SBOM per release |
+| v1.0 |  | React Native SDK + shake-to-report; Vue / Svelte clients (extract `@snapfeed/core` headless package first); plugin marketplace pattern; ServiceNow / Azure DevOps / Trello adapters |
 
 ## Examples
 
-- **Next.js**: `examples/nextjs/` — runnable with `npm install && npm run dev`. Uses `autoAdapters()` + env vars.
+- **Next.js**: [`examples/nextjs/`](./examples/nextjs/) — App Router, `createFeedbackHandler` + `autoAdapters()`.
+- **Vite + React**: [`examples/vite-react/`](./examples/vite-react/) — SPA with a tiny Express backend using `feedbackMiddleware`.
+- **Remix**: [`examples/remix/`](./examples/remix/) — root provider (client-only) + resource-route action.
+- **Admin dashboard**: [`examples/admin/`](./examples/admin/) — Next.js triage tool with filters, bulk actions, dashboard metrics, audit log view, saved views, CSV export. Reads from the JSONL files written by `fileAdapter` and `fileAuditLog`.
 
 ## Contributing
 

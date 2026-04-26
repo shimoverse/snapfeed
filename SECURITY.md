@@ -1,5 +1,15 @@
 # Security Policy
 
+## Related documents
+
+- **[THREAT_MODEL.md](./THREAT_MODEL.md)** — assets, trust boundaries, threat actors, mitigations
+- **[PRIVACY.md](./PRIVACY.md)** — what data is handled and where it goes
+- **[COMPLIANCE.md](./COMPLIANCE.md)** — GDPR / CCPA / HIPAA / SOC 2 / PCI / ISO posture
+- **[docs/SECURITY_REPORT.md](./docs/SECURITY_REPORT.md)** — full audit-style assessment with 13 numbered findings
+- **[docs/SECURE_DEPLOYMENT.md](./docs/SECURE_DEPLOYMENT.md)** — operator hardening guide (network, container, persistence, monitoring)
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)** — system architecture with Mermaid diagrams (sections 5-6 cover trust boundaries and threat surface)
+- **[legal/DPA-template.md](./legal/DPA-template.md)** — Data Processing Addendum template
+
 ## Reporting a vulnerability
 
 If you discover a security vulnerability in snapfeed, please **do not open a public GitHub issue**.

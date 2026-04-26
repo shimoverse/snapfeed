@@ -14,6 +14,8 @@ npm run type-check # tsc --noEmit
 npm test           # vitest (when added)
 ```
 
+> Looking for **end-user installation** docs (you want to *use* snapfeed in your app, not contribute to it)? See the per-persona quickstart guides under [docs/quickstart/](./docs/quickstart/index.md) — indie, startup, mid-size, corp, OSS-maintainer, and designer walkthroughs.
+
 ## What we welcome
 
 - **Adapters** for new destinations (JIRA, Linear, Notion, MS Teams, Discord, ServiceNow, etc.)

@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software in academic or research work, please cite it as below."
+title: snapfeed
+abstract: >-
+  One-tap feedback widget for internal dogfooding. Open-source TypeScript / React
+  library that captures feedback, screenshots, voice, and screen recordings from
+  testers, employees, and beta users, then routes them to bug-tracking and
+  team-chat destinations. Self-hosted, MIT-licensed, with optional bring-your-own-key
+  GenAI features for title generation, severity inference, and deduplication.
+type: software
+authors:
+  - name: "snapfeed contributors"
+  - family-names: Jain
+    given-names: Mohit
+    orcid: ""
+repository-code: "https://github.com/shimoverse/snapfeed"
+license: MIT
+version: 0.4.0
+date-released: 2026-04-26
+keywords:
+  - feedback
+  - dogfooding
+  - developer-tools
+  - open-source
+  - typescript
+  - react
+  - screenshot
+  - voice-feedback
+  - bug-reporting
+  - audit-log

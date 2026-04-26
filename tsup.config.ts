@@ -149,4 +149,28 @@ export default defineConfig([
     treeshake: true,
     outDir: 'dist',
   },
+  // Theme tokens (pure data — useful for consumers extracting just CSS vars)
+  {
+    entry: { theme: 'src/theme.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
+  // Headless API (compound components, render-prop, slot-swap provider)
+  {
+    entry: { 'headless/index': 'src/headless/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom', 'html2canvas'],
+    esbuildOptions(options) {
+      options.jsx = 'automatic'
+    },
+    treeshake: true,
+    splitting: false,
+    outDir: 'dist',
+  },
 ])

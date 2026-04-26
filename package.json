@@ -1,6 +1,6 @@
 {
   "name": "snapfeed",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "One-tap feedback widget for internal dogfooding. Hotkey, screenshot, annotation, voice. Pluggable adapters: Slack, JIRA, Linear, Asana, ClickUp, Notion, MS Teams, GitHub Issues, Discord, Google Sheets, Supabase, Telegram, webhook, file. BYOK LLM (Anthropic, OpenAI, Azure, Bedrock, Ollama). Routing config + Release Campaigns. Three deployment modes: cloud-relayed, self-hosted, air-gapped.",
   "author": "snapfeed contributors",
   "license": "MIT",
@@ -50,7 +50,7 @@
   },
   "type": "module",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "snapfeed": "./dist/cli.cjs"
@@ -58,67 +58,77 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./adapters": {
       "types": "./dist/adapters/index.d.ts",
-      "import": "./dist/adapters/index.mjs",
+      "import": "./dist/adapters/index.js",
       "require": "./dist/adapters/index.cjs"
     },
     "./routing": {
       "types": "./dist/routing.d.ts",
-      "import": "./dist/routing.mjs",
+      "import": "./dist/routing.js",
       "require": "./dist/routing.cjs"
     },
     "./routing-sources": {
       "types": "./dist/routing-sources/index.d.ts",
-      "import": "./dist/routing-sources/index.mjs",
+      "import": "./dist/routing-sources/index.js",
       "require": "./dist/routing-sources/index.cjs"
     },
     "./llm": {
       "types": "./dist/llm/index.d.ts",
-      "import": "./dist/llm/index.mjs",
+      "import": "./dist/llm/index.js",
       "require": "./dist/llm/index.cjs"
     },
     "./voice": {
       "types": "./dist/voice.d.ts",
-      "import": "./dist/voice.mjs",
+      "import": "./dist/voice.js",
       "require": "./dist/voice.cjs"
     },
     "./storage": {
       "types": "./dist/storage/index.d.ts",
-      "import": "./dist/storage/index.mjs",
+      "import": "./dist/storage/index.js",
       "require": "./dist/storage/index.cjs"
     },
     "./audit-log": {
       "types": "./dist/audit-log.d.ts",
-      "import": "./dist/audit-log.mjs",
+      "import": "./dist/audit-log.js",
       "require": "./dist/audit-log.cjs"
     },
     "./network-capture": {
       "types": "./dist/network-capture.d.ts",
-      "import": "./dist/network-capture.mjs",
+      "import": "./dist/network-capture.js",
       "require": "./dist/network-capture.cjs"
     },
     "./screen-recording": {
       "types": "./dist/screen-recording.d.ts",
-      "import": "./dist/screen-recording.mjs",
+      "import": "./dist/screen-recording.js",
       "require": "./dist/screen-recording.cjs"
     },
     "./campaigns": {
       "types": "./dist/campaigns.d.ts",
-      "import": "./dist/campaigns.mjs",
+      "import": "./dist/campaigns.js",
       "require": "./dist/campaigns.cjs"
+    },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "import": "./dist/theme.js",
+      "require": "./dist/theme.cjs"
+    },
+    "./headless": {
+      "types": "./dist/headless/index.d.ts",
+      "import": "./dist/headless/index.js",
+      "require": "./dist/headless/index.cjs"
     },
     "./server/nextjs": {
       "types": "./dist/server/nextjs.d.ts",
-      "import": "./dist/server/nextjs.mjs",
+      "import": "./dist/server/nextjs.js",
       "require": "./dist/server/nextjs.cjs"
     },
     "./server/express": {
       "types": "./dist/server/express.d.ts",
-      "import": "./dist/server/express.mjs",
+      "import": "./dist/server/express.js",
       "require": "./dist/server/express.cjs"
     }
   },
@@ -127,9 +137,23 @@
     "README.md",
     "LICENSE",
     "SECURITY.md",
+    "PRIVACY.md",
+    "THREAT_MODEL.md",
+    "COMPLIANCE.md",
+    "COMPATIBILITY.md",
+    "VERSIONING.md",
+    "SUPPORT.md",
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/MANUAL.md",
+    "docs/PLAYBOOK.md",
+    "docs/ARCHITECTURE.md",
+    "docs/SECURITY_REPORT.md",
+    "docs/customization.md",
+    "docs/quickstart",
+    "legal/DPA-template.md",
+    "legal/THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -138,6 +162,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "size": "size-limit",
     "prepublishOnly": "npm run build && npm run type-check && npm test"
   },
   "peerDependencies": {
@@ -150,14 +179,25 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@size-limit/preset-small-lib": "^11.0.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-security": "^3.0.0",
+    "prettier": "^3.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "size-limit": "^11.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^1.6.0"
   },
   "optionalDependencies": {

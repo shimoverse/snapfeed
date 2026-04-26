@@ -92,7 +92,10 @@ export function telegramAdapter(options: TelegramAdapterOptions): FeedbackAdapte
 
         if (!textRes.ok) {
           const err = await textRes.text().catch(() => '')
-          return { ok: false, error: `Telegram sendMessage failed: ${err.slice(0, 200)}` }
+          return {
+            ok: false,
+            error: `Telegram sendMessage failed (HTTP ${textRes.status}): ${err.slice(0, 200)}`,
+          }
         }
 
         const textData = (await textRes.json()) as {

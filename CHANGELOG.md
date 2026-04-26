@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-04-26
+
+### Added — Customization layer
+- `snapfeed/theme` subpath: `lightTheme`, `darkTheme`, `themeToCss`, `extendTheme`, `SnapfeedTheme`. Pure-data tokens exposed as `--snapfeed-*` CSS variables so consumers can override accent / radii / spacing / fonts without touching React. Re-exported from the main `snapfeed` entry too.
+- `snapfeed/headless` subpath: compound components (`FeedbackRoot`, `FeedbackTrigger` with Radix-style `asChild`, `FeedbackModal`, `FeedbackTextarea`, `FeedbackCategorySelect`, `FeedbackScreenshotPreview`, `FeedbackSubmitButton`, `FeedbackError`, `FeedbackSuccess`), render-prop (`FeedbackHeadless`), slot-swap provider (`FeedbackComponentsProvider` + `useFeedbackComponents`), and the `useFeedbackWidget` hook for fully custom UIs.
+
+### Added — Admin dashboard upgrade
+- `examples/admin/` substantially upgraded: filters by date range / category / status / reporter / page URL / has-screenshot / campaign / search; bulk actions (mark triaged / resolved / wontfix); CSV export of filtered set; local-storage saved views.
+- New Dashboard view (`/dashboard`) with metrics: total feedback by week, breakdown by category and status (inline SVG charts — bar / donut / sparkline), top reporters, top page URLs, mean time-to-triage trend, active campaigns.
+- New Audit view (`/audit`) listing the last 200 audit events with type filter and JSON expansion.
+- `lib/auth.ts` placeholder middleware for SSO wire-up (`x-snapfeed-admin-user` header from your reverse proxy or `SNAPFEED_ADMIN_BYPASS=1` for dev).
+- `lib/data.ts` with sidecar pattern: status updates write to `feedback-status.jsonl`; the immutable adapter-written `feedback.jsonl` stays untouched. Last-write-wins concurrency (Postgres backend in v0.6).
+- `POST /api/admin/feedback/[id]` endpoint for status / notes updates with role check.
+
+### Added — Documentation pack
+- `PRIVACY.md`, `THREAT_MODEL.md`, `COMPLIANCE.md`, `COMPATIBILITY.md`, `VERSIONING.md`, `SUPPORT.md`, `RELEASE.md`, `CITATION.cff`.
+- `legal/DPA-template.md`, `legal/THIRD_PARTY_NOTICES.md`.
+- `docs/quickstart/` — six per-persona walkthroughs (indie, startup, mid-size, corp, OSS-maintainer, designer) — copy-paste runnable.
+- `docs/PRD.md` — internal-quality product requirements doc.
+- `docs/PLAYBOOK.md` — 30/60/90 day rollout playbook for adopters.
+- `docs/MANUAL.md` — full reference manual (~60 KB) covering concepts, installation, configuration, every adapter, routing, LLM, voice/screen, server handler, customization, deployment, operations, migration, troubleshooting (30+ entries), FAQ, glossary, full API reference.
+- `docs/ARCHITECTURE.md` — system architecture with 20 Mermaid diagrams (modes, trust boundaries, threat surface, sequence diagrams, state machines, class diagrams, build pipeline, bundle budget, mindmap of public API).
+- `docs/SECURITY_REPORT.md` — third-party-style audit deliverable with 13 numbered findings (1 High in dev-deps, 0 Medium, 2 Low — both fixed in this release, 10 Info).
+- `docs/SECURE_DEPLOYMENT.md` — operator hardening guide.
+- `docs/customization.md` — three levels of customization (CSS vars, compound components, headless).
+
+### Added — Quality gates and tooling
+- ESLint flat config with typescript-eslint, React, react-hooks, jsx-a11y, import, security plugins.
+- Prettier config + ignore.
+- size-limit budget per subpath.
+- 184 new edge-case tests (network failures, auth failures, rate limit / 5xx, malformed payloads, LLM failure modes, budget clock, server handler edge cases, redact corner cases).
+- New `vite-react/` and `remix/` example apps alongside the existing `nextjs/` and `admin/`.
+
+### Fixed
+- F-002: `telegramAdapter` non-2xx error string now includes the HTTP status code (`Telegram sendMessage failed (HTTP 503): ...`). Previously the status was dropped and only the body bled through.
+- F-003: `redactForLLM` no longer false-positives on macOS temp paths (e.g. `/var/folders/.../T/foo` was being swallowed by `[HIGH_ENTROPY]`). Heuristic now skips any string containing `/` or `\` path separators.
+
+### Changed
+- Bumped to v0.5.0 (significant new public surface: `snapfeed/theme`, `snapfeed/headless`).
+- `tsup.config.ts` adds `theme` and `headless/index` entries (16 build entries total).
+- `package.json` `exports` adds `./theme` and `./headless` subpaths.
+- `package.json` `files` array now ships PRIVACY.md, THREAT_MODEL.md, COMPLIANCE.md, COMPATIBILITY.md, VERSIONING.md, SUPPORT.md, docs/MANUAL.md, docs/PLAYBOOK.md, docs/ARCHITECTURE.md, docs/SECURITY_REPORT.md, docs/customization.md, docs/quickstart/, legal/ — so security teams can read offline after `npm install`.
+- README adds prominent links to all new docs in a "Documentation" section; Customization section linking to the three levels of customization.
+- SECURITY.md cross-links to all related security/privacy/compliance docs and to the new audit report and hardening guide.
+
 ## [0.4.0] — 2026-04-26
 
 ### Added — adapters

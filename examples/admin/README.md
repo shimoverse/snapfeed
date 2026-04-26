@@ -1,11 +1,8 @@
 # snapfeed admin (example)
 
-A minimal Next.js app that reads feedback from a JSONL file (the format
-snapfeed's `fileAdapter` writes) and renders an inbox you can browse,
-search, and filter by category.
-
-This is a starting point — production deployments will plug in Postgres,
-Supabase, or another store via the data adapter pattern.
+A Next.js 14 app that turns a snapfeed JSONL file into a real triage tool —
+filters, bulk actions, a dashboard, audit log, saved views, and CSV export.
+Designed to be self-hosted behind your existing SSO proxy.
 
 ## Quickstart
 
@@ -16,32 +13,97 @@ npm install
 npm run dev
 ```
 
-Then open <http://localhost:3000>.
+Then open <http://localhost:3000>. With `SNAPFEED_ADMIN_BYPASS=1` set, you'll
+be auto-authenticated as a stub admin — flip it off (or remove the env var)
+to require an SSO header.
 
-## How it works
+## What's new in v0.4
 
-- `app/page.tsx` is a server component that reads
-  `SNAPFEED_FEEDBACK_FILE` (default `./feedback.jsonl`), parses each
-  line as a `FeedbackPayload`, and passes the array to a client
-  `<Inbox />` component.
-- `app/inbox.tsx` is the client island: search, category chips,
-  expandable rows, and a local-only "Mark resolved" button.
-- If the file is missing, the page renders an empty state with a
-  pointer to the `fileAdapter`.
+- **Filters bar** with date range, category, status, reporter, page-URL
+  contains, has-screenshot, campaign, and free-text search. Filters live in
+  the URL — share `/?status=open&category=bug` and the next person sees the
+  same view.
+- **Bulk actions:** select rows, then mark triaged / resolved / wontfix in
+  one shot, or export the selection as CSV.
+- **Inline expansion** with full text, screenshot, console errors, build /
+  git SHA / env if your `metadata` carries them, and a notes textarea
+  persisted to a sidecar file.
+- **Dashboard tab** — totals this week / last 30, breakdown by category
+  (bar chart) and status (donut), top reporters and pages, mean time-to-triage
+  weekly sparkline, and active release campaigns. Charts are inline SVG —
+  no Recharts / Chart.js dep added.
+- **Audit log tab** — the last 200 events from `fileAuditLog`, filterable by
+  type, expandable to full JSON. Read-only; the audit file is immutable.
+- **Saved views** — name a filter combination ("P0 bugs from this sprint")
+  and reuse it. Stored in `localStorage`, no server state.
+- **CSV export** — current filtered set or current selection.
+- **Top nav** with Inbox / Dashboard / Audit log.
 
-## Wiring up the source file
+## Auth wire-up
 
-Configure your app to use snapfeed's `fileAdapter`:
+This example ships an intentionally placeholder auth shim
+(`lib/auth.ts`). The expected production topology is a reverse proxy that
+terminates SSO and forwards an identity header:
 
-```ts
-import { fileAdapter } from 'snapfeed/adapters'
+| Header                    | Required | Notes                                  |
+| ------------------------- | -------- | -------------------------------------- |
+| `x-snapfeed-admin-user`   | yes      | Stable user id                         |
+| `x-snapfeed-admin-email`  | no       | Falls back to user id if missing       |
+| `x-snapfeed-admin-role`   | no       | `admin` (default) or `viewer`          |
 
-export const adapters = [fileAdapter({ path: './feedback.jsonl' })]
-```
+Common proxies that map cleanly onto this shape:
 
-Then point this admin at the same path via `SNAPFEED_FEEDBACK_FILE`.
+- [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) — set
+  `--set-xauthrequest=true` and rename via `--set-authorization-header=true`,
+  then a tiny middleware (or your ingress) renames the headers.
+- [Pomerium](https://www.pomerium.com/) — use the
+  [`pass_identity_headers`](https://www.pomerium.com/docs/reference/headers)
+  option; remap `x-pomerium-claim-email` → `x-snapfeed-admin-email`.
+- [Cloudflare Access](https://www.cloudflare.com/zero-trust/products/access/)
+  — `Cf-Access-Authenticated-User-Email` → `x-snapfeed-admin-email`.
+- [Google IAP](https://cloud.google.com/iap) — `X-Goog-Authenticated-User-Email`
+  → `x-snapfeed-admin-email`.
 
-## Roadmap
+For local dev set `SNAPFEED_ADMIN_BYPASS=1` and skip SSO entirely. Do **not**
+ship that flag in any environment that isn't `localhost`.
 
-v0.4 is read-only. v0.5 will add write-back (mark resolved, assign,
-comment) via a server action backed by the same data adapter pattern.
+A first-class auth adapter (NextAuth + SAML/OIDC bridge) is on the v0.6
+roadmap.
+
+## Data layout
+
+The admin reads three JSONL files (paths configurable via env, see
+`.env.example`):
+
+| File                            | Direction       | Written by                        |
+| ------------------------------- | --------------- | --------------------------------- |
+| `SNAPFEED_FEEDBACK_FILE`        | read-only       | `fileAdapter` from your app       |
+| `SNAPFEED_AUDIT_LOG_FILE`       | read-only       | `fileAuditLog`                    |
+| `SNAPFEED_FEEDBACK_STATUS_FILE` | append-only     | this admin (sidecar pattern)      |
+
+### The sidecar pattern
+
+Triage state — `status`, `notes`, `triagedBy`, `resolvedAt`, … — never
+touches the immutable feedback file. Instead, every status change appends one
+JSON line to `SNAPFEED_FEEDBACK_STATUS_FILE`, keyed by a stable `id` we
+derive from `(timestamp, reporter, text-prefix)`. On read we replay the
+sidecar in order, so the latest entry wins per id.
+
+This lets you back up, ship, and analyse the feedback file completely
+independently of the admin's mutable state.
+
+### Concurrency caveat
+
+The sidecar is plain append. If two admins triage the same record in the
+same millisecond, the entry written second wins on the next read — there is
+no row-level lock. For the JSONL scale this admin targets (single instance,
+tens of thousands of records), that is fine. If you need stronger guarantees,
+wait for the v0.6 Postgres backend or wrap the write path in your own queue.
+
+## Roadmap to v0.6
+
+- **Postgres-backed inbox** — drop-in adapter for the data layer; same UI.
+- **First-class auth adapter** — NextAuth + SAML/OIDC bridge.
+- **Multi-tenant** — org scoping for hosted deployments.
+- **Webhook out** — fire on status transitions so Linear / Jira can react.
+- **Saved views per user, server-side** — instead of `localStorage`-only.

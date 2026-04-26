@@ -48,6 +48,12 @@ const CC_PATTERN = /(?<!\d)(?:\d[ -]?){13,19}(?!\d)/g
 const HIGH_ENTROPY_PATTERN = /[A-Za-z0-9_\-./+=]{40,}/g
 
 function looksHighEntropy(s: string): boolean {
+  // F-003 fix: file system paths (especially macOS temp paths like
+  // /var/folders/.../T/foo) often satisfy the upper+lower+digit+length test
+  // by coincidence. Skip anything that looks like a path so we don't mangle
+  // stack traces or temp-file references in feedback.
+  if (s.includes('/') || s.includes('\\')) return false
+
   let hasUpper = false
   let hasLower = false
   let hasDigit = false

@@ -527,7 +527,6 @@ export function FeedbackWidget() {
                     <div
                       style={{ position: 'relative', display: 'inline-flex', alignItems: 'flex-start', gap: '8px' }}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imagePreview}
                         alt="Attached screenshot"

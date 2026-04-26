@@ -978,7 +978,6 @@ export function FeedbackInbox({
                                 >
                                   Screenshot
                                 </div>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={`data:${row.image_mime_type ?? 'image/png'};base64,${row.image_base64}`}
                                   alt="Feedback screenshot"

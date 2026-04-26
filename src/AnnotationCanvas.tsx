@@ -513,7 +513,6 @@ export function AnnotationCanvas({
         }}
       >
         {/* Background image */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageDataUrl}
           alt="Screenshot to annotate"
