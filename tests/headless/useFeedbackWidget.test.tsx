@@ -14,7 +14,7 @@
  * is the first real headless coverage.
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, cleanup, render, renderHook } from '@testing-library/react'
 
 // @testing-library/react usually wires cleanup() automatically when used
@@ -264,5 +264,137 @@ describe('FeedbackProvider — context resolution under SSR-style render', () =>
         </FeedbackProvider>
       )
     ).not.toThrow()
+  })
+})
+
+// ─── v0.7: production-readiness mount warning ──────────────────────────────
+
+describe('FeedbackProvider — production-readiness warning (v0.7)', () => {
+  // Background: in production with `enableInProduction: false` (the default),
+  // the widget renders nothing. Today: silent. Result: indie devs deploy and
+  // think the widget is broken when it just opted out for safety.
+  // v0.7: log a one-time console.warn at mount with the explanation + fix.
+
+  let savedNodeEnv: string | undefined
+  let savedLocation: Location
+
+  beforeEach(() => {
+    savedNodeEnv = process.env.NODE_ENV
+    savedLocation = window.location
+  })
+
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = savedNodeEnv
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: savedLocation,
+    })
+  })
+
+  // jsdom's window.location.hostname is read-only, so we replace the
+  // entire `location` object. The provider's prod warning intentionally
+  // suppresses on localhost (so `NODE_ENV=production npm run dev` doesn't
+  // spam) — tests that simulate a real production host must flip this.
+  function setHostname(h: string): void {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: { ...savedLocation, hostname: h, host: h, href: `https://${h}/` },
+    })
+  }
+
+  it('warns once on mount when NODE_ENV=production AND enableInProduction !== true', () => {
+    process.env.NODE_ENV = 'production'
+    setHostname('app.example.com')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    render(
+      <FeedbackProvider
+        appName="ProdApp"
+        adapters={[recordingAdapter()]}
+        floatingButton={false}
+        // enableInProduction omitted → defaults to false
+      >
+        <div>app</div>
+      </FeedbackProvider>
+    )
+
+    const messages = warn.mock.calls.map((c) => String(c[0]))
+    expect(
+      messages.some(
+        (m) => /enableInProduction/.test(m) && /production/i.test(m)
+      )
+    ).toBe(true)
+  })
+
+  it('does NOT warn when NODE_ENV=production AND enableInProduction is true', () => {
+    process.env.NODE_ENV = 'production'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    render(
+      <FeedbackProvider
+        appName="ProdApp"
+        adapters={[recordingAdapter()]}
+        floatingButton={false}
+        enableInProduction
+      >
+        <div>app</div>
+      </FeedbackProvider>
+    )
+
+    const messages = warn.mock.calls.map((c) => String(c[0]))
+    expect(messages.some((m) => /enableInProduction/.test(m))).toBe(false)
+  })
+
+  it('does NOT warn in development', () => {
+    process.env.NODE_ENV = 'development'
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    render(
+      <FeedbackProvider
+        appName="DevApp"
+        adapters={[recordingAdapter()]}
+        floatingButton={false}
+      >
+        <div>app</div>
+      </FeedbackProvider>
+    )
+
+    const messages = warn.mock.calls.map((c) => String(c[0]))
+    expect(messages.some((m) => /enableInProduction/.test(m))).toBe(false)
+  })
+
+  it('warns at most once per provider mount even when re-rendered', () => {
+    // React 18 strict mode runs effects mount-unmount-mount in dev. The warn
+    // ref guard must allow exactly one warning per provider lifetime.
+    process.env.NODE_ENV = 'production'
+    setHostname('app.example.com')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { rerender } = render(
+      <FeedbackProvider
+        appName="ProdApp"
+        adapters={[recordingAdapter()]}
+        floatingButton={false}
+      >
+        <div>app</div>
+      </FeedbackProvider>
+    )
+    rerender(
+      <FeedbackProvider
+        appName="ProdApp"
+        adapters={[recordingAdapter()]}
+        floatingButton={false}
+      >
+        <div>app v2</div>
+      </FeedbackProvider>
+    )
+
+    const matches = warn.mock.calls
+      .map((c) => String(c[0]))
+      .filter((m) => /enableInProduction/.test(m))
+    expect(matches.length).toBeLessThanOrEqual(1)
   })
 })

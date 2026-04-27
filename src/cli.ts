@@ -10,6 +10,7 @@ import { existsSync, readFileSync, writeFileSync, statSync, mkdirSync } from 'no
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
+import { runDoctor, formatReport } from './cli-doctor'
 
 // ─── Version ────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,8 @@ interface ParsedArgs {
   mode?: Mode
   destinations?: Destination[]
   hotkey?: string
+  /** doctor: optional URL to probe with a GET to verify the dev server. */
+  probe?: string
   help: boolean
 }
 
@@ -118,6 +121,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       out.hotkey = a.slice('--hotkey='.length)
     } else if (a === '--hotkey') {
       out.hotkey = argv[++i] ?? ''
+    } else if (a.startsWith('--probe=')) {
+      out.probe = a.slice('--probe='.length)
+    } else if (a === '--probe') {
+      out.probe = argv[++i] ?? ''
     }
   }
   return out
@@ -541,15 +548,26 @@ function printHelp() {
 
 Usage:
   npx snapfeed init [flags]
+  npx snapfeed doctor [--probe=<url>]
 
-Flags:
+Commands:
+  init      Scaffold snapfeed.config.ts + .env.example (+ Next.js handler).
+  doctor    Health-check your snapfeed setup. First-stop debug command.
+
+Init flags:
   -y, --yes                 Skip prompts; use defaults (file + console).
       --mode=<n>            1=cloud / 2=self-hosted / 3=air-gapped (also accepts string form: cloud, self-hosted, air-gapped)
       --destinations=<csv>  Comma-separated list, e.g. file,slack,github
       --hotkey=<key>        Hotkey to toggle the widget (default: ctrl+shift+f)
+
+Doctor flags:
+      --probe=<url>         Hit this URL with a GET (e.g. http://localhost:3000/api/feedback)
+                            to verify your dev server's handler is mounted.
+
+Common:
   -h, --help                Show this help
 
-Files created:
+Files created by 'init':
   - snapfeed.config.ts at project root
   - .env.example (or merged into existing) at project root
   - app/api/feedback/route.ts when Next.js is detected
@@ -748,6 +766,17 @@ async function main() {
     case 'init':
       await runInit(args)
       return
+    case 'doctor': {
+      const report = await runDoctor({ cwd: process.cwd(), probeUrl: args.probe })
+      console.log(formatReport(report))
+      // Exit non-zero when any check failed so CI scripts can gate on it.
+      const failed = report.checks.some((c) => c.status === 'fail')
+      process.exit(failed ? 1 : 0)
+      // unreachable; satisfies ESLint's no-fallthrough rule which doesn't know
+      // process.exit returns `never`.
+      // eslint-disable-next-line no-unreachable
+      return
+    }
     default:
       err(`Unknown command "${args.command}". Run \`npx snapfeed --help\`.`)
       process.exit(1)

@@ -82,6 +82,75 @@ function warnOnUnprefixedTypos(): void {
 }
 
 /**
+ * The full set of `SNAPFEED_*` env vars `autoAdapters()` knows about — the
+ * canonical list from `AutoEnvKeys`. Used by the near-miss typo detector
+ * below to suggest the closest known name.
+ */
+const KNOWN_SNAPFEED_KEYS = Object.values(AutoEnvKeys) as string[]
+const KNOWN_SNAPFEED_KEYS_SET = new Set(KNOWN_SNAPFEED_KEYS)
+
+/** Iterative Levenshtein. ~150 ops per pair — cheap at our env-var counts. */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  // Single row, in-place — O(min(a, b)) memory.
+  const m = a.length
+  const n = b.length
+  let prev = new Array<number>(n + 1)
+  let curr = new Array<number>(n + 1)
+  for (let j = 0; j <= n; j++) prev[j] = j
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1
+      curr[j] = Math.min(
+        curr[j - 1]! + 1,        // insertion
+        prev[j]! + 1,            // deletion
+        prev[j - 1]! + cost      // substitution
+      )
+    }
+    ;[prev, curr] = [curr, prev]
+  }
+  return prev[n]!
+}
+
+/**
+ * For every `SNAPFEED_*` env var the user set that does NOT match a known
+ * key, find the closest known key (Levenshtein distance ≤ 3 — covers
+ * common single-char typos like missing letter, transposition, or a
+ * one-letter substitution while staying away from coincidental matches).
+ *
+ * Skips values that are themselves valid `SNAPFEED_*` keys (so legitimate
+ * `SNAPFEED_SLACK_USERNAME` doesn't get flagged as a typo of
+ * `SNAPFEED_SLACK_WEBHOOK`).
+ */
+function warnOnNearMissTypos(): void {
+  if (typeof process === 'undefined' || !process.env) return
+  const userKeys = Object.keys(process.env).filter(
+    (k) => k.startsWith('SNAPFEED_') && !KNOWN_SNAPFEED_KEYS_SET.has(k)
+  )
+  for (const k of userKeys) {
+    let bestKey: string | undefined
+    let bestDistance = Infinity
+    for (const known of KNOWN_SNAPFEED_KEYS) {
+      const d = levenshtein(k, known)
+      if (d < bestDistance) {
+        bestDistance = d
+        bestKey = known
+      }
+    }
+    // Distance ≤ 3 = plausible typo. Beyond that we'd hallucinate matches
+    // for unrelated names like `SNAPFEED_TOTALLY_UNRELATED_THING`.
+    if (bestKey && bestDistance > 0 && bestDistance <= 3) {
+      console.warn(
+        `[snapfeed] Did you mean ${bestKey}? Found ${k} but snapfeed does not read that variable.`
+      )
+    }
+  }
+}
+
+/**
  * Inspect `process.env` and return the configured adapters.
  *
  * Detection order (all matching adapters are returned):
@@ -98,9 +167,11 @@ function warnOnUnprefixedTypos(): void {
  * warning via `console.warn`.
  */
 export function autoAdapters(): FeedbackAdapter[] {
-  // Surface common prefix-typos before doing anything else, so the warning
-  // shows up alongside whatever decision the rest of the function makes.
+  // Surface common prefix-typos and near-miss typos before doing anything
+  // else, so the warnings show up alongside whatever decision the rest of
+  // the function makes.
   warnOnUnprefixedTypos()
+  warnOnNearMissTypos()
 
   const adapters: FeedbackAdapter[] = []
 
@@ -175,6 +246,24 @@ export function autoAdapters(): FeedbackAdapter[] {
       typeof process !== 'undefined' && process.env?.NODE_ENV === 'production'
 
     if (!isProd) {
+      // Dev fallback. Surface a warning so first-time integrators don't
+      // think the widget is broken when feedback only shows up in
+      // ./feedback.jsonl + the console — both pre-v0.7 silent fallbacks
+      // burned hours of confusion. Skipped if a near-miss typo warning
+      // already fired (it explains the root cause better).
+      const someTypoSuggested =
+        typeof process !== 'undefined' &&
+        process.env &&
+        Object.keys(process.env).some(
+          (k) =>
+            k.startsWith('SNAPFEED_') && !KNOWN_SNAPFEED_KEYS_SET.has(k)
+        )
+      if (!someTypoSuggested) {
+        console.warn(
+          '[snapfeed] No SNAPFEED_* env vars detected — falling back to file + console adapters (writes to ./feedback.jsonl). ' +
+            `Set one of ${KNOWN_SNAPFEED_KEYS.join(', ')} to wire a real destination.`
+        )
+      }
       return [fileAdapter({ path: 'feedback.jsonl' }), consoleAdapter()]
     }
 

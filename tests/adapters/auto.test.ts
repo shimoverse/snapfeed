@@ -213,4 +213,112 @@ describe('autoAdapters', () => {
     expect(warn).toHaveBeenCalled()
     expect(warn.mock.calls[0]![0]).toMatch(/owner\/repo/)
   })
+
+  // ─── v0.7: near-miss typo detection + dev-fallback explanation ────────
+
+  describe('near-miss typo detection (v0.7)', () => {
+    // After the EXACT-match unprefixed check, also catch close-but-wrong
+    // prefixed names like SNAPFEED_SLACK_WEBHOK (missing "O") that
+    // previously silently fell through to the "no adapters configured"
+    // dev-fallback path with no clue why.
+    afterEach(() => {
+      // Clean any extra typo-shaped vars these tests set.
+      for (const k of [
+        'SNAPFEED_SLACK_WEBHOK',
+        'SNAPFEED_SLAK_WEBHOOK',
+        'SNAPFEED_GITHB_TOKEN',
+        'SNAPFEED_DISCORD_WEBOOK',
+        'SNAPFEED_TELEGRAM_BOT',
+      ]) {
+        delete process.env[k]
+      }
+    })
+
+    function mentionsBoth(messages: string[], typo: string, suggested: string): boolean {
+      return messages.some((m) => m.includes(typo) && m.includes(suggested))
+    }
+
+    it('warns with a "did you mean" suggestion when SNAPFEED_SLACK_WEBHOK (missing O) is set', () => {
+      process.env.NODE_ENV = 'development'
+      process.env.SNAPFEED_SLACK_WEBHOK = 'https://hooks.slack.com/services/T/B/abc'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(mentionsBoth(messages, 'SNAPFEED_SLACK_WEBHOK', 'SNAPFEED_SLACK_WEBHOOK')).toBe(true)
+    })
+
+    it('warns when SNAPFEED_DISCORD_WEBOOK (missing H) is set', () => {
+      process.env.NODE_ENV = 'development'
+      process.env.SNAPFEED_DISCORD_WEBOOK = 'https://discord.com/api/webhooks/1/abc'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(mentionsBoth(messages, 'SNAPFEED_DISCORD_WEBOOK', 'SNAPFEED_DISCORD_WEBHOOK')).toBe(true)
+    })
+
+    it('warns when SNAPFEED_GITHB_TOKEN (missing U) is set', () => {
+      process.env.NODE_ENV = 'development'
+      process.env.SNAPFEED_GITHB_TOKEN = 'ghp_test'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(mentionsBoth(messages, 'SNAPFEED_GITHB_TOKEN', 'SNAPFEED_GITHUB_TOKEN')).toBe(true)
+    })
+
+    it('does NOT suggest when the env var is too far from any known name', () => {
+      process.env.NODE_ENV = 'development'
+      // Distance ≥ 4 from any known SNAPFEED_* — should NOT trip a suggestion
+      // (we only suggest when the typo is plausibly close).
+      process.env.SNAPFEED_TOTALLY_UNRELATED_THING = 'value'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(
+        messages.some((m) => /Did you mean SNAPFEED_/i.test(m))
+      ).toBe(false)
+      delete process.env.SNAPFEED_TOTALLY_UNRELATED_THING
+    })
+
+    it('does NOT suggest when the suspected typo is itself a valid SNAPFEED_ key', () => {
+      // SNAPFEED_SLACK_USERNAME is a real key — must not be flagged as a
+      // typo of SNAPFEED_SLACK_WEBHOOK just because the prefix matches.
+      process.env.NODE_ENV = 'development'
+      process.env.SNAPFEED_SLACK_USERNAME = 'feedback-bot'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(
+        messages.some((m) => /Did you mean.*SNAPFEED_SLACK_USERNAME/i.test(m))
+      ).toBe(false)
+    })
+  })
+
+  describe('dev-fallback explanatory warning (v0.7)', () => {
+    it('warns once explaining the fallback when dev mode falls back to file+console', () => {
+      // No real adapter env vars set, dev mode → file + console fallback.
+      // Today this is silent; integrators have no idea their env var didn't
+      // resolve to a real adapter. v0.7 adds an info-level explanation.
+      process.env.NODE_ENV = 'development'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(
+        messages.some((m) =>
+          /falling back to file \+ console/i.test(m) ||
+          /no SNAPFEED_\* env vars detected/i.test(m)
+        )
+      ).toBe(true)
+    })
+
+    it('does NOT warn about fallback when a real adapter env var IS set', () => {
+      process.env.NODE_ENV = 'development'
+      process.env.SNAPFEED_SLACK_WEBHOOK = 'https://hooks.slack.com/services/T/B/abc'
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      autoAdapters()
+      const messages = warn.mock.calls.map((c) => String(c[0]))
+      expect(
+        messages.some((m) => /falling back/i.test(m))
+      ).toBe(false)
+    })
+  })
 })

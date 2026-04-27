@@ -126,6 +126,8 @@ If all three are true, you're done. The next time you (or anyone) loads the app 
 
 ## Troubleshooting
 
+> **Run `npx snapfeed doctor` first.** It prints a green/yellow/red checklist of your install, framework, env vars, typo suggestions, and handler file. Most of the rows below are auto-flagged. Add `--probe=http://localhost:3000/api/feedback` to also verify your dev server's handler is reachable.
+
 | Symptom | Fix |
 |---------|-----|
 | Slack message never arrives, terminal logs `Slack webhook returned 404` or `403` | The webhook URL is wrong, was revoked, or the Slack app was deleted. Regenerate one (step 4) and replace the value in `.env.local`, then restart `npm run dev`. |

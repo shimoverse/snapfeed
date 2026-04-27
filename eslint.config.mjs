@@ -40,6 +40,10 @@ export default [
       'examples/*/build/**',
       'examples/*/dist/**',
       'examples/*/public/build/**',
+      // Developer tooling — not shipped in the npm tarball, not part of CI.
+      // The capture-screenshots ESM script tickles the `__dirname`/`URL`/
+      // `document` rules in ways that aren't worth carving out a config block.
+      'scripts/**',
       'coverage/**',
       '**/*.tsbuildinfo',
     ],

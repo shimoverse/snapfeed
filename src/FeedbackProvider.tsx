@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -285,6 +286,26 @@ export function FeedbackProvider({
     mergedConfig.enableInProduction ||
     (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') ||
     (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+
+  // v0.7: One-time mount warning when the provider is going to render
+  // nothing because production safety kicked in. Indie devs were
+  // deploying snapfeed and seeing a silent no-op widget — they thought
+  // the install was broken when it had just opted out for safety.
+  // The ref-guard ensures we warn at most once per provider instance,
+  // including under React 18 StrictMode mount-unmount-mount cycles.
+  const prodWarnRef = useRef(false)
+  useEffect(() => {
+    if (prodWarnRef.current) return
+    if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') return
+    if (mergedConfig.enableInProduction) return
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') return
+    prodWarnRef.current = true
+    console.warn(
+      '[snapfeed] Widget hidden in production because enableInProduction is false (the default). ' +
+        'Set enableInProduction={true} on <FeedbackProvider> to show the widget for end users — ' +
+        'or gate it behind a role check so only your team sees it.'
+    )
+  }, [mergedConfig.enableInProduction])
 
   // Intercept console errors for metadata.
   //

@@ -990,6 +990,13 @@ Adapter contracts (`FeedbackAdapter`) have not changed since v0.1. Adapter *opti
 
 ## 13. Troubleshooting encyclopedia
 
+> **First-stop debug command: `npx snapfeed doctor`.** It prints a green/yellow/red checklist of your setup — install version, framework, destinations wired, env-var typos (with did-you-mean suggestions), Next.js handler file presence, and an optional `--probe=<url>` to verify your dev server's `/api/feedback` route is reachable. Most of the rows below are flagged automatically. Exits non-zero on failures so you can run it in CI.
+
+```bash
+npx snapfeed doctor
+npx snapfeed doctor --probe=http://localhost:3000/api/feedback
+```
+
 | # | Symptom | Likely cause | Fix |
 |---|---|---|---|
 | 1 | Widget doesn't appear in production | `enableInProduction: false` (default) | Set `enableInProduction={user.role === 'admin'}` (role-gated) |
