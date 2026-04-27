@@ -1,0 +1,124 @@
+name: Release
+
+# Triggered when you push a git tag matching `vX.Y.Z` (e.g. `v0.7.0`).
+# Verifies the same gates as CI, then publishes to npm and creates a
+# GitHub Release. Wire NPM_TOKEN as a repository secret first — see
+# RELEASE.md for the one-time setup walkthrough.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'      # final releases
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'    # pre-releases (e.g. v0.7.0-rc.1)
+
+# `id-token: write` enables npm provenance — every published version gets
+# a Sigstore-signed attestation that npm displays in the package page.
+# Free, no infra required, and a real supply-chain win for adopters.
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Verify, publish to npm, create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so we can extract the changelog section for the tag.
+          fetch-depth: 0
+
+      - name: Setup Node + npm registry
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          # Required for npm publish to find the correct registry + auth.
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        run: npm ci
+
+      - name: Verify version match
+        # Catches the "tagged v0.7.0 but forgot to bump package.json" mistake
+        # before we publish a wrong version to the registry.
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "package.json version: $PKG_VERSION"
+          echo "git tag version:      $TAG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch — package.json is $PKG_VERSION but tag is v$TAG_VERSION."
+            echo "::error::Bump package.json + commit before tagging, or delete the tag and retry."
+            exit 1
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Pack (verify tarball shape)
+        run: |
+          npm pack --dry-run
+          # Sanity: the tarball must include README, LICENSE, and dist/.
+          npm pack --dry-run 2>&1 | grep -q 'README.md'
+          npm pack --dry-run 2>&1 | grep -q 'LICENSE'
+          npm pack --dry-run 2>&1 | grep -q 'dist/index.cjs'
+
+      - name: Publish to npm
+        # `--provenance` requires `id-token: write` in the workflow permissions.
+        # `--access public` is required the first time a scoped/unscoped pkg is
+        # published; harmless to repeat.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract changelog section for this version
+        id: changelog
+        # Pulls the `## [vX.Y.Z] — date` block out of CHANGELOG.md so the
+        # GitHub Release body matches what's in the changelog.
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Match either `## [0.7.0] — ...` or `## 0.7.0` heading styles.
+          # Grab everything between the matching heading and the next `## ` heading.
+          BODY=$(awk -v ver="$VERSION" '
+            $0 ~ "^## *\\[?" ver "\\]? *(—|-|$)" { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            echo "::warning::No CHANGELOG section found for v$VERSION; using placeholder body."
+            BODY="See [CHANGELOG.md](./CHANGELOG.md) for details."
+          fi
+          # Heredoc-encode so multi-line content survives into the next step.
+          {
+            echo 'body<<EOF'
+            echo "$BODY"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}
+          # Prerelease for tags like v0.7.0-rc.1
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Attach the .tgz so consumers can audit the exact bytes that were
+          # published (matches what `npm pack` produces locally).
+          files: |
+            snapfeed-*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

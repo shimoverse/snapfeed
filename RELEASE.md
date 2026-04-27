@@ -6,6 +6,71 @@ How maintainers cut a snapfeed release. Written so a contributor can do it witho
 
 ---
 
+## Three-command automated release (the happy path)
+
+After the [one-time setup](#one-time-setup-for-the-automated-flow) below, every release is three commands:
+
+```bash
+# 1. Edit CHANGELOG.md — move [Unreleased] section to a new ## [X.Y.Z] — YYYY-MM-DD
+git commit -am "changelog: vX.Y.Z"
+
+# 2. Bump version + create the git tag in one shot
+npm version patch    # or: npm version minor / npm version major
+
+# 3. Push commit and tag — the Release workflow takes over
+git push origin main --follow-tags
+```
+
+The [`Release` workflow](./.github/workflows/release.yml) on GitHub Actions then:
+
+1. Verifies `package.json` version matches the git tag (catches "tagged but forgot to bump").
+2. Runs the same gates as CI: build + type-check + test + lint + pack-shape sanity.
+3. Publishes to npm with [provenance](https://docs.npmjs.com/generating-provenance-statements) (Sigstore-signed attestation visible on npmjs.com).
+4. Creates a GitHub Release with the new CHANGELOG section as the body and the `.tgz` attached.
+
+Watch it at <https://github.com/shimoverse/snapfeed/actions>. Takes ~3 minutes end-to-end.
+
+> If anything in the workflow fails, see [§ When something goes wrong](#when-something-goes-wrong-in-the-automated-flow) below — usually it's a CHANGELOG section the workflow couldn't find or a tag/version mismatch. The detailed manual flow further down is the fallback.
+
+---
+
+### One-time setup for the automated flow
+
+You only do these once per maintainer / once per repo.
+
+**1. Claim the npm package name** (only the very first time, before the workflow has anything to publish to):
+
+```bash
+npm login
+npm publish --dry-run                    # confirm package shape
+npm publish --access public              # the first publish — you become the owner
+```
+
+If `snapfeed` is already taken on npm, fall back to `@shimoverse/snapfeed` (change `name` in `package.json`, then re-publish).
+
+**2. Generate an npm automation token.** <https://www.npmjs.com/settings/~/tokens> → **Generate New Token** → **Automation** type → name it `snapfeed-github-actions`. Copy the token.
+
+**3. Add the token to GitHub Actions secrets.** Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
+
+- Name: `NPM_TOKEN`
+- Value: paste the automation token
+
+**4. (Optional, recommended) Enable npm trusted publishing.** Once the package exists on npm, go to <https://www.npmjs.com/settings/~/packages/snapfeed/access> → **Trusted Publisher** → **Add GitHub Actions**. Repository: `shimoverse/snapfeed`. Workflow: `release.yml`. After this, you can delete the `NPM_TOKEN` secret — the workflow's `id-token: write` permission proves identity to npm via OIDC.
+
+---
+
+### When something goes wrong in the automated flow
+
+| Symptom | Fix |
+|---|---|
+| Workflow fails at "Verify version match" with *"package.json is X but tag is vY"* | You ran `git tag` manually instead of `npm version`. Delete the tag (`git tag -d vY && git push origin :refs/tags/vY`), bump `package.json` to the right value, retag with `npm version`. |
+| Workflow fails at "Publish to npm" with auth error | `NPM_TOKEN` secret is missing/expired. Re-do step 3 of one-time setup, OR set up the trusted-publisher path (step 4) and remove the token entirely. |
+| Workflow fails at "Test" but the same tests pass locally | New devDep wasn't checked into `package-lock.json`, or test depends on TZ / wallclock. Read the workflow logs, fix on `main`, then re-tag. |
+| Workflow not triggered after pushing a tag | Tag doesn't match `v[0-9]+.[0-9]+.[0-9]+` or `v...-...`. If you tagged `release-X.Y.Z` (no `v` prefix), retag. |
+| Already published the wrong version | npm allows **deprecating** but not deleting once propagated. `npm deprecate snapfeed@X.Y.Z "Bad release — use X.Y.Z+1"`, then bump and republish. |
+
+---
+
 ## Pre-release checklist
 
 Run through this list **before** starting the cut. Each item must pass.

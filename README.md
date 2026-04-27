@@ -368,6 +368,20 @@ const myTheme = extendTheme(lightTheme, { colors: { accent: '#7c3aed' } })
 
 See [docs/customization.md](./docs/customization.md) for the full guide and Tailwind / shadcn / Material-UI integration recipes.
 
+## Mobile support
+
+Honest read of where snapfeed sits on mobile. The widget is React DOM-based — it runs anywhere a browser does. Native apps need a separate SDK that we haven't built yet.
+
+| Surface | Status | Notes |
+|---|---|---|
+| **Mobile web** (responsive sites in mobile browsers) | ✅ supported | Touch targets ≥ 44×44 CSS px, hotkey gracefully degrades to the floating button on touch devices, theme tokens auto-detect dark mode via `prefers-color-scheme`, `prefers-reduced-motion` honored. Voice + screen recording work on mobile Safari 14.5+ / Chrome Android with one caveat: **screen recording is unsupported on iOS Safari** (no `getDisplayMedia`) — the widget feature-detects and hides the button. |
+| **Progressive Web Apps** (PWAs in standalone mode) | ✅ supported | Same widget code; runs in the same WebView the browser uses. No special config needed. |
+| **React Native** (iOS + Android) | 🚧 v1.0 roadmap | Today snapfeed assumes a browser DOM (`window`, `document`, `MediaRecorder`, `html2canvas`). React Native has none of those. A separate `@snapfeed/react-native` package — with native shake-to-report, native screenshot capture, and a React Native-friendly modal — is planned for v1.0. |
+| **Native iOS / Android** (Swift / Kotlin SDKs) | 🚧 v1.0+ roadmap | Same blocker as React Native; would require separate native SDKs. Best path today: open a WebView pointed at a snapfeed-hosting page on your domain. |
+| **Capacitor / Cordova / Tauri** (web-shell hybrids) | ✅ works (it's still a browser) | Treat as mobile web above. |
+
+> If your team needs native mobile feedback today, the most practical workaround is a server-side bridge: the native app POSTs to a `/api/feedback` endpoint that calls `createFeedbackHandler` server-side. You lose the widget UX (you'd build your own form natively), but you keep all of snapfeed's adapter routing, audit log, and storage. See [`docs/MANUAL.md` §1.2](./docs/MANUAL.md#12-adapters) for the payload contract.
+
 ## Documentation
 
 | | |
