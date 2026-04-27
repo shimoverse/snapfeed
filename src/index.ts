@@ -11,18 +11,29 @@ export type { AnnotationCanvasProps } from './AnnotationCanvas'
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 export { useDevFeedback } from './useDevFeedback'
 
-// ─── Adapters (also available from snapfeed/adapters) ───────────────
+// ─── Adapters (browser-safe subset) ─────────────────────────────────────────
+//
+// Only adapters that use pure `fetch` (no node built-ins) are re-exported
+// from the main barrel. Server-only adapters that import `node:fs`,
+// `node:path`, or `node:crypto` (`fileAdapter`, `googleSheetsAdapter`)
+// must be imported from `snapfeed/adapters` instead — keeping them out of
+// the main barrel prevents bundler warnings / failures in browser builds
+// (Vite, Remix, etc.) for the common case where a consumer only wants
+// the React widget.
+//
+// Migration from v0.5.x:
+//   import { fileAdapter, googleSheetsAdapter } from 'snapfeed'
+//     -> import { fileAdapter, googleSheetsAdapter } from 'snapfeed/adapters'
+//
 export { consoleAdapter } from './adapters/console'
 export { webhookAdapter } from './adapters/webhook'
 export { telegramAdapter } from './adapters/telegram'
 export { slackAdapter } from './adapters/slack'
 export { supabaseAdapter } from './adapters/supabase'
 export { githubAdapter } from './adapters/github'
-export { fileAdapter } from './adapters/file'
 export { discordAdapter } from './adapters/discord'
 export { jiraAdapter } from './adapters/jira'
 export { linearAdapter } from './adapters/linear'
-export { googleSheetsAdapter } from './adapters/googleSheets'
 export { msTeamsAdapter } from './adapters/msTeams'
 export { asanaAdapter } from './adapters/asana'
 export { clickUpAdapter } from './adapters/clickUp'
@@ -79,5 +90,12 @@ export type {
   RateLimitStore,
 } from './types'
 
-// ─── Server security utilities (for custom store implementations) ─────────────
-export { defaultRateLimitStore } from './server/security'
+// `defaultRateLimitStore` and the rest of the server-security helpers
+// (`validatePayload`, `checkOrigin`, `checkRateLimit`, `normalizePayload`)
+// have moved to the `snapfeed/server/security` subpath as of v0.6.0.
+// They were removed from the main barrel because they are server-only and
+// were forcing every browser bundle to walk through them.
+//
+// Migration from v0.5.x:
+//   import { defaultRateLimitStore } from 'snapfeed'
+//     -> import { defaultRateLimitStore } from 'snapfeed/server/security'

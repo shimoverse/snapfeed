@@ -931,6 +931,12 @@ mindmap
       createFeedbackHandler
     snapfeed/server/express
       feedbackMiddleware
+    snapfeed/server/security
+      validatePayload
+      checkOrigin
+      checkRateLimit
+      defaultRateLimitStore
+      normalizePayload
     snapfeed/routing
       defineRouting
       resolveRoute

@@ -266,3 +266,122 @@ describe('s3Storage error handling', () => {
     expect(message).toContain('…')
   })
 })
+
+// ─── v0.6 retention primitives ──────────────────────────────────────────────
+
+describe('s3Storage.delete (v0.6)', () => {
+  it('issues a signed DELETE to the same URL as upload and returns deleted=true on 204', async () => {
+    const { captured } = stubFetch({ status: 204, statusText: 'No Content' })
+    const adapter = s3Storage(baseOpts)
+
+    const result = await adapter.delete!('shot.png')
+    expect(result).toEqual({ deleted: true })
+
+    expect(captured).toHaveLength(1)
+    const req = captured[0]!
+    expect(req.method).toBe('DELETE')
+    expect(req.url).toBe('https://my-bucket.s3.us-east-1.amazonaws.com/shot.png')
+    expect(req.headers.Authorization).toMatch(/^AWS4-HMAC-SHA256 /)
+    // SigV4 requires the empty-payload sha256.
+    const emptyHash = createHash('sha256').update(new Uint8Array()).digest('hex')
+    expect(req.headers['x-amz-content-sha256']).toBe(emptyHash)
+  })
+
+  it('returns deleted=false on a 404 (NoSuchKey) — idempotent semantics', async () => {
+    stubFetch({ status: 404, statusText: 'Not Found', body: '<Error><Code>NoSuchKey</Code></Error>' })
+    const adapter = s3Storage(baseOpts)
+    const result = await adapter.delete!('does-not-exist.png')
+    expect(result).toEqual({ deleted: false })
+  })
+
+  it('throws on a 403 (AccessDenied) so the caller can surface the misconfig', async () => {
+    stubFetch({
+      status: 403,
+      statusText: 'Forbidden',
+      body: '<Error><Code>AccessDenied</Code></Error>',
+    })
+    const adapter = s3Storage(baseOpts)
+    await expect(adapter.delete!('shot.png')).rejects.toThrow(
+      /s3Storage delete failed: 403 Forbidden/
+    )
+  })
+
+  it('uses path-style URLs when forcePathStyle is true', async () => {
+    const { captured } = stubFetch({ status: 204 })
+    const adapter = s3Storage({
+      ...baseOpts,
+      endpoint: 'http://localhost:9000',
+      forcePathStyle: true,
+    })
+    await adapter.delete!('shot.png')
+    expect(captured[0]!.url).toBe('http://localhost:9000/my-bucket/shot.png')
+  })
+})
+
+describe('s3Storage.listOlderThan (v0.6)', () => {
+  // Two-key list response. The keys are ISO 8601 mtimes per the S3 API.
+  const sampleListXml = `<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <Name>my-bucket</Name>
+  <Prefix></Prefix>
+  <KeyCount>2</KeyCount>
+  <MaxKeys>1000</MaxKeys>
+  <IsTruncated>false</IsTruncated>
+  <Contents>
+    <Key>old.png</Key>
+    <LastModified>2026-01-01T00:00:00.000Z</LastModified>
+    <Size>123</Size>
+  </Contents>
+  <Contents>
+    <Key>new.png</Key>
+    <LastModified>2026-04-25T00:00:00.000Z</LastModified>
+    <Size>456</Size>
+  </Contents>
+</ListBucketResult>`
+
+  it('issues a signed GET on /?list-type=2 and parses Contents entries', async () => {
+    const { captured } = stubFetch({ status: 200, body: sampleListXml })
+    const adapter = s3Storage(baseOpts)
+
+    // Cutoff at 2026-02-01 — old.png (Jan 1) is older, new.png (Apr 25) is not.
+    const cutoff = Date.parse('2026-02-01T00:00:00.000Z')
+    const list = await adapter.listOlderThan!(cutoff)
+
+    expect(list).toHaveLength(1)
+    expect(list[0]!.deliveryId).toBe('old.png')
+    expect(list[0]!.uploadedAt).toBe(Date.parse('2026-01-01T00:00:00.000Z'))
+
+    expect(captured).toHaveLength(1)
+    const req = captured[0]!
+    expect(req.method).toBe('GET')
+    expect(req.url).toBe(
+      'https://my-bucket.s3.us-east-1.amazonaws.com/?list-type=2'
+    )
+    expect(req.headers.Authorization).toMatch(/^AWS4-HMAC-SHA256 /)
+  })
+
+  it('returns an empty array for an empty bucket', async () => {
+    const emptyXml = `<?xml version="1.0"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <Name>my-bucket</Name>
+  <KeyCount>0</KeyCount>
+  <IsTruncated>false</IsTruncated>
+</ListBucketResult>`
+    stubFetch({ status: 200, body: emptyXml })
+    const adapter = s3Storage(baseOpts)
+    const list = await adapter.listOlderThan!(Date.now())
+    expect(list).toEqual([])
+  })
+
+  it('throws on a non-2xx list response', async () => {
+    stubFetch({
+      status: 403,
+      statusText: 'Forbidden',
+      body: '<Error><Code>AccessDenied</Code></Error>',
+    })
+    const adapter = s3Storage(baseOpts)
+    await expect(adapter.listOlderThan!(Date.now())).rejects.toThrow(
+      /s3Storage list failed: 403 Forbidden/
+    )
+  })
+})

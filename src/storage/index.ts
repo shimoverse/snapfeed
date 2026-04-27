@@ -6,6 +6,19 @@
  * `StorageAdapter` interface against your own backend.
  */
 
-export type { StorageAdapter, StorageUploadInput, StorageUploadResult } from './types'
+export type {
+  StorageAdapter,
+  StorageUploadInput,
+  StorageUploadResult,
+  StorageDeleteResult,
+  StorageEntry,
+} from './types'
 export { fileStorage, type FileStorageOptions } from './file'
 export { s3Storage, type S3StorageOptions } from './s3'
+export {
+  pruneOlderThan,
+  type PruneResult,
+  type PruneOptions,
+  type PruneCutoff,
+  type PruneLogEntry,
+} from './retention'

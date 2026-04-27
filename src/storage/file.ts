@@ -8,7 +8,13 @@
  * **Node only.** Throws a clear error in browsers / edge runtimes.
  */
 
-import type { StorageAdapter, StorageUploadInput, StorageUploadResult } from './types'
+import type {
+  StorageAdapter,
+  StorageDeleteResult,
+  StorageEntry,
+  StorageUploadInput,
+  StorageUploadResult,
+} from './types'
 
 export interface FileStorageOptions {
   /**
@@ -94,6 +100,103 @@ export function fileStorage(options: FileStorageOptions = {}): StorageAdapter {
         url,
         deliveryId: absolutePath,
       }
+    },
+
+    /**
+     * Delete a previously-uploaded file by deliveryId. Idempotent: if the
+     * file does not exist, returns `{ deleted: false }` rather than throwing.
+     *
+     * **Path traversal guard.** Refuses to delete any path outside the
+     * configured `dir`. fileStorage.delete is only allowed to touch its own
+     * upload tree — we'd rather throw and let the caller correlate a stale
+     * audit-log entry with a misconfiguration than silently `unlink` a
+     * sibling file.
+     */
+    async delete(deliveryId: string): Promise<StorageDeleteResult> {
+      const isNode =
+        typeof process !== 'undefined' &&
+        typeof process.versions !== 'undefined' &&
+        typeof process.versions.node === 'string'
+
+      if (!isNode) {
+        throw new Error('fileStorage.delete requires Node')
+      }
+
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+
+      const absoluteDir = path.isAbsolute(dir) ? dir : path.resolve(process.cwd(), dir)
+      const absoluteTarget = path.resolve(deliveryId)
+      const absoluteScope = path.resolve(absoluteDir)
+
+      // Scope check — must be a descendant of (or exactly) the configured dir.
+      // Using `relative` + a non-`..` startswith is robust against symlink
+      // tricks the way path-prefix-matching is not.
+      const rel = path.relative(absoluteScope, absoluteTarget)
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        throw new Error(
+          `fileStorage.delete: refusing to delete ${deliveryId} — path is outside the configured dir (${absoluteScope})`
+        )
+      }
+
+      try {
+        await fs.unlink(absoluteTarget)
+        return { deleted: true }
+      } catch (err: unknown) {
+        const code = (err as { code?: string } | null)?.code
+        if (code === 'ENOENT') {
+          return { deleted: false }
+        }
+        throw err
+      }
+    },
+
+    /**
+     * List uploads whose mtime is at or before `cutoffMs`. Used by the
+     * `pruneOlderThan` retention helper. Returns an empty array (not throws)
+     * if the configured dir does not exist yet — that's the cold-start case
+     * before any upload has happened.
+     */
+    async listOlderThan(cutoffMs: number): Promise<StorageEntry[]> {
+      const isNode =
+        typeof process !== 'undefined' &&
+        typeof process.versions !== 'undefined' &&
+        typeof process.versions.node === 'string'
+
+      if (!isNode) {
+        throw new Error('fileStorage.listOlderThan requires Node')
+      }
+
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+
+      const absoluteDir = path.isAbsolute(dir) ? dir : path.resolve(process.cwd(), dir)
+
+      let entries: string[]
+      try {
+        entries = await fs.readdir(absoluteDir)
+      } catch (err: unknown) {
+        const code = (err as { code?: string } | null)?.code
+        if (code === 'ENOENT') return []
+        throw err
+      }
+
+      const out: StorageEntry[] = []
+      for (const name of entries) {
+        const full = path.join(absoluteDir, name)
+        let st: { mtime: Date; isFile(): boolean }
+        try {
+          st = await fs.stat(full)
+        } catch {
+          continue // raced with another deleter, skip
+        }
+        if (!st.isFile()) continue
+        const mtimeMs = st.mtime.getTime()
+        if (mtimeMs <= cutoffMs) {
+          out.push({ deliveryId: full, uploadedAt: mtimeMs })
+        }
+      }
+      return out
     },
   }
 }

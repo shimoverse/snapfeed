@@ -15,7 +15,13 @@
  * **Node only** (uses `node:crypto`). Throws a clear error in browsers.
  */
 
-import type { StorageAdapter, StorageUploadInput, StorageUploadResult } from './types'
+import type {
+  StorageAdapter,
+  StorageDeleteResult,
+  StorageEntry,
+  StorageUploadInput,
+  StorageUploadResult,
+} from './types'
 
 export interface S3StorageOptions {
   bucket: string
@@ -110,6 +116,8 @@ interface SignInput {
   method: string
   host: string
   path: string                        // already-encoded path portion of URL
+  /** Already-canonicalized query string, e.g. `'list-type=2'`. Empty by default. */
+  query?: string
   region: string
   service: string                     // 's3'
   accessKeyId: string
@@ -158,7 +166,7 @@ function signRequest(crypto: Crypto, input: SignInput): SignOutput {
   const canonicalRequest = [
     input.method.toUpperCase(),
     input.path,
-    '',                       // canonical query string (empty for our PUTs)
+    input.query ?? '',                // canonical query string (empty for PUTs)
     canonicalHeaders,
     signedHeaders,
     input.payloadHash,
@@ -366,5 +374,168 @@ export function s3Storage(options: S3StorageOptions): StorageAdapter {
         deliveryId: key,
       }
     },
+
+    /**
+     * DELETE the object at the given key. Idempotent: a 404 returns
+     * `{ deleted: false }` rather than throwing — S3 also returns 204 on
+     * already-gone keys, so the boolean reflects actual presence.
+     *
+     * Other non-2xx responses (403 AccessDenied, 5xx) throw so the caller
+     * can correlate the failure with their IAM / network setup.
+     */
+    async delete(deliveryId: string): Promise<StorageDeleteResult> {
+      if (!isNode()) {
+        throw new Error('s3Storage.delete requires Node (uses node:crypto)')
+      }
+      const crypto = await import('node:crypto')
+
+      const { url, host, pathForSigning } = buildUrl({
+        bucket,
+        region,
+        key: deliveryId,
+        endpoint,
+        forcePathStyle,
+      })
+
+      // SigV4 requires the empty-payload sha256 for DELETE with no body.
+      const emptyPayloadHash = sha256Hex(crypto, new Uint8Array())
+
+      const signed = signRequest(crypto, {
+        method: 'DELETE',
+        host,
+        path: pathForSigning,
+        region,
+        service: 's3',
+        accessKeyId,
+        secretAccessKey,
+        payloadHash: emptyPayloadHash,
+        headers: {},
+      })
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          ...signed.headersToSend,
+          Authorization: signed.authorization,
+        },
+      })
+
+      // S3 returns 204 No Content on success and 404 NoSuchKey for missing
+      // objects (some compatible providers return 200). Both 204 and 200 are
+      // "gone now"; 404 specifically means it didn't exist.
+      if (response.status === 404) {
+        return { deleted: false }
+      }
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        const truncated = text.length > 500 ? `${text.slice(0, 500)}…` : text
+        throw new Error(
+          `s3Storage delete failed: ${response.status} ${response.statusText}` +
+            (truncated ? ` — ${truncated}` : '')
+        )
+      }
+      return { deleted: true }
+    },
+
+    /**
+     * GET /?list-type=2 (S3 ListObjectsV2) and return entries whose
+     * `LastModified` is at or before the cutoff. Parses the XML response
+     * with a small regex-based reader — sufficient for the tightly-scoped
+     * shape S3 returns and avoids pulling in an XML parser dependency.
+     *
+     * Note: this lists the WHOLE bucket per call; if you bucket-share with
+     * other apps, set `S3StorageOptions.toKey` to a prefix and filter the
+     * returned `deliveryId`s accordingly.
+     */
+    async listOlderThan(cutoffMs: number): Promise<StorageEntry[]> {
+      if (!isNode()) {
+        throw new Error('s3Storage.listOlderThan requires Node (uses node:crypto)')
+      }
+      const crypto = await import('node:crypto')
+
+      // Reuse buildUrl for host derivation; the listing URL is the bucket
+      // root with `?list-type=2`, not a per-key URL, so we discard
+      // `pathForSigning` and compute a list-specific signing path below.
+      const { url: baseUrl, host } = buildUrl({
+        bucket,
+        region,
+        key: '',
+        endpoint,
+        forcePathStyle,
+      })
+
+      // Bucket-root URL + the V2 list query.
+      const url = `${baseUrl}?list-type=2`
+      const path = forcePathStyle ? `/${bucket}/` : '/'
+
+      const emptyPayloadHash = sha256Hex(crypto, new Uint8Array())
+
+      const signed = signRequest(crypto, {
+        method: 'GET',
+        host,
+        path,
+        query: 'list-type=2',
+        region,
+        service: 's3',
+        accessKeyId,
+        secretAccessKey,
+        payloadHash: emptyPayloadHash,
+        headers: {},
+      })
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          ...signed.headersToSend,
+          Authorization: signed.authorization,
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        const truncated = text.length > 500 ? `${text.slice(0, 500)}…` : text
+        throw new Error(
+          `s3Storage list failed: ${response.status} ${response.statusText}` +
+            (truncated ? ` — ${truncated}` : '')
+        )
+      }
+
+      const body = await response.text()
+      return parseListBucketResult(body, cutoffMs)
+    },
   }
+}
+
+/**
+ * Tiny regex-based parser for `<Contents>...<Key>...</Key>...<LastModified>...
+ * </LastModified>...</Contents>` blocks. Sufficient for the well-defined
+ * S3 ListObjectsV2 response shape; not a general XML parser.
+ *
+ * @internal
+ */
+export function parseListBucketResult(xml: string, cutoffMs: number): StorageEntry[] {
+  const out: StorageEntry[] = []
+  // Non-greedy match for each <Contents> block.
+  const blockPattern = /<Contents\b[^>]*>([\s\S]*?)<\/Contents>/g
+  for (const match of xml.matchAll(blockPattern)) {
+    const block = match[1]!
+    const keyMatch = /<Key>([\s\S]*?)<\/Key>/.exec(block)
+    const lmMatch = /<LastModified>([\s\S]*?)<\/LastModified>/.exec(block)
+    if (!keyMatch || !lmMatch) continue
+    const lmMs = Date.parse(lmMatch[1]!.trim())
+    if (Number.isNaN(lmMs)) continue
+    if (lmMs <= cutoffMs) {
+      out.push({ deliveryId: decodeXmlEntities(keyMatch[1]!.trim()), uploadedAt: lmMs })
+    }
+  }
+  return out
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
 }

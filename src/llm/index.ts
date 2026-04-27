@@ -41,10 +41,15 @@ export { ollamaProvider } from './providers/ollama'
 // neither over- nor under-provisioned. A single one-size-fits-all estimate
 // (the old `ESTIMATED_MAX_TOKENS_PER_CALL = 512`) was ~10x too generous for
 // title and ~30x for severity, which made the pre-gate effectively useless.
+//
+// `redact` ceiling tracks the input size loosely — we cap at 512 since the
+// rewritten output should never grow much beyond the input; if it does,
+// the LLM is likely hallucinating commentary instead of redacting.
 export const MAX_TOKENS_PER_FEATURE = {
   title: 64,
   severity: 16,
   repro: 256,
+  redact: 512,
 } as const
 
 /**
@@ -100,7 +105,8 @@ export async function applyLLM(
   if (!config.enabled) return result
 
   const features = config.features ?? {}
-  const anyFeature = features.title || features.severity || features.repro
+  const anyFeature =
+    features.title || features.severity || features.repro || features.redact
   if (!anyFeature) return result
 
   const provider = createProvider(config)
@@ -234,6 +240,42 @@ export async function applyLLM(
     }
   }
 
+  // ── redact (v0.6) ────────────────────────────────────────────────────────
+  // LLM second-pass redaction of `payload.text`. The user-message passes the
+  // ORIGINAL text (not `text` after `redactBeforeLLM`) — the regex pre-pass
+  // already replaced things like emails with `[EMAIL]`, so feeding the
+  // already-tagged version to a second redactor would produce nested tags
+  // and confuse the model. The redact feature's job is to catch what regex
+  // missed (names, addresses, custom-format IDs, contextual PII).
+  if (features.redact) {
+    if (budget && !budget.allow(MAX_TOKENS_PER_FEATURE.redact)) {
+      pushWarning(result, 'redact: skipped (budget exhausted)')
+    } else {
+      try {
+        const { text: out, tokensUsed } = await provider.complete({
+          system:
+            'Rewrite the following text replacing any personally-identifiable information (names, emails, phone numbers, addresses, IDs), credentials, secrets, or otherwise sensitive content with the literal token [REDACTED]. Preserve all other words and punctuation. Output ONLY the rewritten text — no preamble, no commentary, no quoting, no formatting.',
+          user: payload.text,
+          maxTokens: MAX_TOKENS_PER_FEATURE.redact,
+          signal,
+        })
+        result.tokensUsed += accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.redact, result, 'redact')
+        budget?.record(accountTokens(tokensUsed, MAX_TOKENS_PER_FEATURE.redact))
+        const cleaned = out.trim()
+        if (cleaned.length > 0) {
+          result.redactedText = cleaned
+          result.redactionApplied = cleaned !== payload.text
+        } else {
+          // Empty response: treat as a soft failure so the consumer doesn't
+          // overwrite their feedback text with nothing.
+          pushWarning(result, 'redact: empty response — payload text left unchanged')
+        }
+      } catch (err) {
+        pushWarning(result, `redact: ${describeError(err)}`)
+      }
+    }
+  }
+
   return result
 }
 
@@ -262,7 +304,7 @@ function accountTokens(
   reported: number,
   cap: number,
   result?: LLMRunResult,
-  feature?: 'title' | 'severity' | 'repro'
+  feature?: 'title' | 'severity' | 'repro' | 'redact'
 ): number {
   if (reported < 0) {
     if (result && feature) {

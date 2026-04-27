@@ -358,3 +358,103 @@ describe('applyLLM — pre-LLM redaction', () => {
     expect(userMsg).toContain('ananya@company.com')
   })
 })
+
+// ─── v0.6: features.redact — LLM second-pass redaction ─────────────────────
+
+describe('applyLLM — features.redact (v0.6)', () => {
+  it('returns redactedText on the result when the feature ran successfully', async () => {
+    const llmRedactedOutput =
+      'Customer (name [REDACTED], phone [REDACTED]) reports the checkout flow is failing.'
+
+    stubFetchSequence([openaiResponse(llmRedactedOutput, 40)])
+
+    const payloadWithPII: FeedbackPayload = {
+      ...samplePayload,
+      text: 'Customer (name Ananya Sharma, phone +1-555-0142) reports the checkout flow is failing.',
+    }
+
+    const result = await applyLLM(
+      payloadWithPII,
+      makeOpenAIConfig({ features: { redact: true } })
+    )
+
+    expect(result.redactedText).toBe(llmRedactedOutput)
+    expect(result.redactionApplied).toBe(true)
+    expect(result.degraded).toBe(false)
+  })
+
+  it('does not run the redact feature when features.redact is unset', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await applyLLM(samplePayload, makeOpenAIConfig({ features: {} }))
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.redactedText).toBeUndefined()
+    expect(result.redactionApplied).toBeUndefined()
+  })
+
+  it('runs the redact pass alongside other features (one fetch per feature)', async () => {
+    const fetchMock = stubFetchSequence([
+      openaiResponse('Checkout broken', 20),
+      openaiResponse('Bug report — [REDACTED] customer affected', 35),
+    ])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { title: true, redact: true } })
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.title).toBe('Checkout broken')
+    expect(result.redactedText).toContain('[REDACTED]')
+  })
+
+  it('skips and warns when budget is exhausted', async () => {
+    const budget = createBudgetTracker(10) // tiny — repro=256 will not fit
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { redact: true } }),
+      { budget }
+    )
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result.redactedText).toBeUndefined()
+    expect(result.degraded).toBe(true)
+    expect(result.warnings?.some((w) => w.startsWith('redact: skipped (budget exhausted)'))).toBe(true)
+  })
+
+  it('degrades gracefully on a provider error and does not throw', async () => {
+    stubFetchSequence([
+      { throws: new Error('connection reset') },
+    ])
+
+    const result = await applyLLM(
+      samplePayload,
+      makeOpenAIConfig({ features: { redact: true } })
+    )
+
+    expect(result.redactedText).toBeUndefined()
+    expect(result.degraded).toBe(true)
+    expect(result.warnings?.some((w) => w.startsWith('redact:'))).toBe(true)
+  })
+
+  it('marks redactionApplied=false when the LLM returns the text unchanged', async () => {
+    // The model decides nothing needed redacting → returns the same string.
+    // We should still surface the call (redactedText set) but flag that no
+    // edits were applied so the consumer can decide whether to overwrite.
+    const original = 'Build #4823 succeeds locally but fails in CI.'
+    stubFetchSequence([openaiResponse(original, 12)])
+
+    const result = await applyLLM(
+      { ...samplePayload, text: original },
+      makeOpenAIConfig({ features: { redact: true } })
+    )
+
+    expect(result.redactedText).toBe(original)
+    expect(result.redactionApplied).toBe(false)
+  })
+})

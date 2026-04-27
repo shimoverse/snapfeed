@@ -26,6 +26,7 @@ Anything reachable from these subpath exports is part of the public API and prot
 | `snapfeed/adapters` | All adapter factories and the `FeedbackAdapter` / `FeedbackAdapterResult` interfaces |
 | `snapfeed/server/nextjs` | `createFeedbackHandler` for Next.js App Router |
 | `snapfeed/server/express` | `feedbackMiddleware` for Express ≥ 4 |
+| `snapfeed/server/security` | `validatePayload`, `checkOrigin`, `checkRateLimit`, `defaultRateLimitStore`, `normalizePayload`, `sanitizeConsoleError`, exported `RateLimitStore` interface (from `snapfeed`) |
 | `snapfeed/routing` | `defineRouting`, `matchUrl`, `resolveRoute`, `mergeDestinations` |
 | `snapfeed/routing-sources` | `csvRoutingSource`, `googleSheetsRoutingSource`, `cacheRoutingSource` |
 | `snapfeed/llm` | `applyLLM`, `createProvider`, `createBudgetTracker`, `redactForLLM`, provider factories (`anthropicProvider`, `openaiProvider`, `ollamaProvider`) |

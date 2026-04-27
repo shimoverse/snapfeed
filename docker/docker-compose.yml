@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# snapfeed self-hosted stack (v0.5)
+# snapfeed self-hosted stack (v0.6)
 #
 # Bring up with:    docker compose -f docker/docker-compose.yml up
 # Configure via:    docker/.env  (copy from docker/.env.example first)
@@ -11,15 +11,25 @@
 #   ollama    Optional in-tenant LLM. OFF by default — enable with:
 #                 docker compose --profile llm up
 #
-# Postgres is intentionally NOT included for v0.5. Feedback is appended to
-# an audit-log JSONL file, and uploaded media goes to MinIO. A v0.6 release
+# Postgres is intentionally NOT included for v0.6. Feedback is appended to
+# an audit-log JSONL file, and uploaded media goes to MinIO. A v0.7 release
 # will add a Postgres-backed inbox.
+#
+# ─── Image digest pinning ───────────────────────────────────────────────────
+# Every external image below is pinned to a SPECIFIC, IMMUTABLE TAG (no
+# `:latest`). For supply-chain-grade reproducibility, also pin by sha256
+# digest — operators in regulated environments should run:
+#
+#     ./docker/pin-digests.sh > docker/digests.lock
+#     ./docker/pin-digests.sh --apply    # rewrites this compose file in place
+#
+# That script issues `docker pull` + `docker inspect` for each image and
+# rewrites `image: foo:tag` to `image: foo:tag@sha256:<digest>`. The lock
+# file commits to git so subsequent pulls always fetch the same bytes.
 #
 # Air-gapped notes:
 #   - No outbound calls at runtime unless you configure SNAPFEED_* env vars
 #     pointing at external services (Slack, GitHub, etc.).
-#   - Image tags are named, not pinned by digest — see docker/README.md for
-#     reproducible-build guidance.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -79,7 +89,11 @@ services:
       start_period: 10s
 
   ollama:
-    image: ollama/ollama:latest
+    # Pinned to a specific, immutable tag — never `:latest` (which would
+    # silently change behavior on every image refresh). Bump deliberately
+    # by editing this file; air-gapped operators should additionally pin
+    # by sha256 digest via `./docker/pin-digests.sh --apply`.
+    image: ollama/ollama:0.6.0
     container_name: snapfeed-ollama
     restart: unless-stopped
     ports:

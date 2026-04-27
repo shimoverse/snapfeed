@@ -177,3 +177,101 @@ describe('fileStorage — filename sanitization', () => {
     expect(result.deliveryId).toBe(path.join(dir, 'p-normal.png'))
   })
 })
+
+// ─── v0.6 retention primitives ──────────────────────────────────────────────
+
+describe('fileStorage.delete (v0.6)', () => {
+  it('deletes a previously-uploaded file by deliveryId and returns deleted=true', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'pfx' })
+    const { deliveryId } = await adapter.upload(baseInput)
+
+    // Pre-condition: file exists.
+    await expect(stat(deliveryId)).resolves.toBeDefined()
+
+    const result = await adapter.delete!(deliveryId)
+    expect(result).toEqual({ deleted: true })
+
+    // Post-condition: file no longer exists.
+    await expect(stat(deliveryId)).rejects.toBeDefined()
+  })
+
+  it('returns deleted=false (not throw) when the file does not exist', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+    // Trigger dir creation so the parent dir exists, then point at a missing file.
+    await adapter.upload(baseInput)
+
+    const ghost = path.join(dir, 'never-existed.png')
+    const result = await adapter.delete!(ghost)
+    expect(result).toEqual({ deleted: false })
+  })
+
+  it('refuses to delete a path that escapes the configured dir', async () => {
+    // Path traversal guard: even if the caller passes a deliveryId outside
+    // `dir`, the adapter must NOT delete it. fileStorage.delete is only
+    // allowed to touch its own upload tree.
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir })
+    await adapter.upload(baseInput) // ensure dir is created
+
+    // Create a sibling file outside the upload dir.
+    const sibling = path.join(os.tmpdir(), `should-survive-${Date.now()}.txt`)
+    await mkdir(path.dirname(sibling), { recursive: true })
+    await (await import('node:fs/promises')).writeFile(sibling, 'untouchable')
+    createdDirs.push(sibling) // ensure cleanup attempts to remove it too
+
+    await expect(adapter.delete!(sibling)).rejects.toThrow(/outside/i)
+
+    // Sibling must still exist.
+    await expect(stat(sibling)).resolves.toBeDefined()
+  })
+})
+
+describe('fileStorage.listOlderThan (v0.6)', () => {
+  it('returns deliveryIds for files whose mtime is at or before the cutoff', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir, prefix: () => 'p' })
+
+    const oldUpload = await adapter.upload({ ...baseInput, filename: 'old.png' })
+    const newUpload = await adapter.upload({ ...baseInput, filename: 'new.png' })
+
+    // Backdate the old upload by 24h.
+    const yesterdayMs = Date.now() - 24 * 60 * 60 * 1000
+    const yesterdaySec = yesterdayMs / 1000
+    const utimes = (await import('node:fs/promises')).utimes
+    await utimes(oldUpload.deliveryId, yesterdaySec, yesterdaySec)
+
+    // Cutoff = 1h ago. The old (24h ago) file is older; the new one is not.
+    const cutoff = Date.now() - 60 * 60 * 1000
+    const oldList = await adapter.listOlderThan!(cutoff)
+
+    const oldIds = oldList.map((e) => e.deliveryId)
+    expect(oldIds).toContain(oldUpload.deliveryId)
+    expect(oldIds).not.toContain(newUpload.deliveryId)
+
+    // Sanity: each entry has an `uploadedAt` epoch ms field roughly matching
+    // the file's mtime.
+    const oldEntry = oldList.find((e) => e.deliveryId === oldUpload.deliveryId)
+    expect(oldEntry?.uploadedAt).toBeGreaterThan(0)
+    expect(Math.abs(oldEntry!.uploadedAt - yesterdayMs)).toBeLessThan(2000)
+  })
+
+  it('returns an empty array when no files are older than the cutoff', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir })
+    await adapter.upload(baseInput)
+
+    const epochZero = 0
+    const list = await adapter.listOlderThan!(epochZero)
+    expect(list).toEqual([])
+  })
+
+  it('returns an empty array when the dir does not exist yet (no uploads)', async () => {
+    const dir = tmpDir()
+    const adapter = fileStorage({ dir })
+    // Don't upload anything — dir is never created.
+    const list = await adapter.listOlderThan!(Date.now())
+    expect(list).toEqual([])
+  })
+})

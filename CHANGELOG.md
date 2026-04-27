@@ -6,6 +6,141 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-04-26
+
+First minor release after the v0.5.x publish-readiness sequence. Lands
+the high-impact roadmap items that are real implementations (not
+scaffolding): main-barrel split for browser tree-shaking, time-based
+storage retention primitives, LLM-driven second-pass redaction, real
+React widget tests, and docker image-digest pinning. Items needing
+external credentials/services (SBOM CI workflow, SSO/SAML, signed
+offline tarball, README screenshots) are deferred to v0.7 rather than
+half-shipped.
+
+### Breaking changes
+
+The following moved out of the main `snapfeed` barrel to keep browser
+bundles free of node-built-in imports. Migration is mechanical:
+
+- `fileAdapter`, `googleSheetsAdapter` — import from `snapfeed/adapters`
+  instead. Both depend on `node:fs` / `node:crypto` and were forcing
+  every browser bundle to walk past dynamic-import warnings (Vite,
+  Remix). They remain available unchanged from `snapfeed/adapters`.
+- `defaultRateLimitStore` — import from `snapfeed/server/security`
+  instead. The full security helper set (`validatePayload`,
+  `checkOrigin`, `checkRateLimit`, `defaultRateLimitStore`,
+  `normalizePayload`, `sanitizeConsoleError`) is now a real public
+  subpath. Previously only `defaultRateLimitStore` re-exported through
+  the barrel and `VERSIONING.md` falsely advertised the subpath.
+
+```ts
+// v0.5.x
+import { fileAdapter, googleSheetsAdapter, defaultRateLimitStore } from 'snapfeed'
+
+// v0.6.0
+import { fileAdapter, googleSheetsAdapter } from 'snapfeed/adapters'
+import { defaultRateLimitStore } from 'snapfeed/server/security'
+```
+
+The remaining 13 adapters (`consoleAdapter`, `webhookAdapter`,
+`slackAdapter`, `discordAdapter`, `telegramAdapter`, `supabaseAdapter`,
+`githubAdapter`, `jiraAdapter`, `linearAdapter`, `msTeamsAdapter`,
+`asanaAdapter`, `clickUpAdapter`, `notionAdapter`) are pure-`fetch` and
+stay re-exported from the main barrel.
+
+### Added
+
+- **Storage retention primitives** for time-based pruning:
+  - `StorageAdapter.delete(deliveryId)` — delete a single asset.
+    Idempotent: returns `{ deleted: false }` when the asset doesn't
+    exist (rather than throwing).
+  - `StorageAdapter.listOlderThan(cutoffMs)` — list assets whose
+    upload/mtime is at or before the cutoff.
+  - `pruneOlderThan(cutoff, { storage, log?, failOnMissing? })` —
+    high-level helper that walks `listOlderThan` and `delete`s every
+    returned entry, returning `{ deletedUploads, failedUploads,
+    notFoundUploads, errors }`. Accepts either an absolute epoch-ms
+    cutoff or `{ retentionDays: N }` shorthand.
+  - Implemented for both `fileStorage` (real `fs.unlink` /
+    `fs.readdir` + scope guard against path traversal) and `s3Storage`
+    (signed DELETE + signed `?list-type=2` GET with a small XML reader
+    for `<Contents>` blocks). 37 new tests.
+  - **Scope (v0.6):** time-based pruning only. GDPR-style
+    `deleteByUserId` deferred to v0.7 — that needs a new audit-log
+    read API and a `feedback.uploaded` event type to correlate
+    reporters back to their uploads.
+- **LLM `features.redact`** — real second-pass redaction of
+  `payload.text`. Asks the LLM to rewrite the input replacing PII /
+  secrets / contextual identifiers with the literal token
+  `[REDACTED]`, returning the rewritten string on
+  `LLMRunResult.redactedText` plus a `redactionApplied: boolean` flag
+  that signals whether the LLM actually changed anything. Opt-in,
+  budget-aware, and degrades gracefully on provider errors. 6 new
+  tests in the runner suite.
+- **`snapfeed/server/security` public subpath** — promoted from
+  internal to a real public export. Closes a doc/reality gap from
+  v0.5.x where `VERSIONING.md` advertised the subpath but the
+  package.json `exports` map didn't include it.
+- **Real React widget tests** — `jsdom@^24` and
+  `@testing-library/react@^16` added as devDeps, the two `.tsx` test
+  placeholders converted into 13 real tests (10 cover
+  `useFeedbackWidget` state machine end-to-end through React; 3 cover
+  `FeedbackTrigger` compound component including `asChild`). The
+  remaining 11 modal-focus-trap and slot-swap cases stay as `it.todo`
+  for v0.7 — they need richer fixture setup. Tests run under jsdom
+  via vitest's `environmentMatchGlobs` so non-DOM tests stay fast on
+  Node.
+- **Docker image digests** — `docker/pin-digests.sh` runbook script
+  resolves and applies sha256 digests to every external image in
+  `docker-compose.yml`. Operators run
+  `./docker/pin-digests.sh --apply` on their own docker daemon, then
+  commit the rewritten compose file. Compose now also pins to
+  specific tags (no `:latest` for ollama).
+
+### Changed
+
+- **`snapfeed` main barrel slimmed** for browser-bundle tree-shaking
+  (see Breaking changes above). Vite + Remix consumers no longer hit
+  node-built-in externalization warnings for the common React-only
+  import path.
+- **`SECURITY.md`** — image-digest pinning checkbox flipped to ✅
+  (shipped in v0.6).
+
+### Verification
+
+- `npm run type-check` clean.
+- `npm run build` clean — 17 entry points (incl. new
+  `server/security`) emit ESM + CJS + `.d.ts` + `.d.cts`.
+- `npx vitest run` — 51 test files, **642 passed | 12 skipped | 11
+  todo (665)**, 0 unhandled errors. Up from 602 passing in v0.5.3.
+- `npm run lint` — 0 errors, 22 pre-existing warnings.
+- `npm pack --dry-run` — 130 files, 803.6 KB packed, includes
+  `dist/server/security.{js,cjs,d.ts,d.cts}`.
+- `examples/nextjs`, `examples/remix`, `examples/vite-react`, and
+  `examples/admin` all build successfully end-to-end.
+- Smoke-test confirms the barrel split: `snapfeed` no longer exports
+  `fileAdapter`/`googleSheetsAdapter`/`defaultRateLimitStore`;
+  `snapfeed/server/security` re-exports all six security helpers;
+  `snapfeed/storage` exposes `pruneOlderThan`.
+
+### Known limitations carried into v0.7
+
+- **GDPR `deleteByUserId`** — needs a new audit-log read API and a
+  `feedback.uploaded` event type to correlate reporters with their
+  uploads. The v0.6 retention primitives (`delete`, `listOlderThan`,
+  `pruneOlderThan`) are the building blocks; the higher-level helper
+  is v0.7.
+- **SBOM publishing per release** — needs CI changes and GitHub
+  Actions secrets that I can't provision solo. v0.7 ships a
+  `.github/workflows/sbom.yml` once the release process stabilizes.
+- **SSO/SAML for the admin app** — needs an OAuth provider for end-
+  to-end testing. v0.7 will wire OIDC + SAML once a test IdP is
+  available.
+- **Signed offline tarball** — needs cosign keys and a release
+  attestation flow. v0.7 work.
+- **README screenshots / visual walkthroughs** — needs a running
+  preview server pass. v0.7.
+
 ## [0.5.3] — 2026-04-26
 
 Final pre-publish hardening pass after a four-agent deep review surfaced

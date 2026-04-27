@@ -179,10 +179,18 @@ restart the worker.
 - `npm ci --omit=dev` runs at **image build time only**. After the image is
   built, no further package installs happen — the runtime container has
   no network egress requirement.
-- **Image tags are named, not pinned by digest.** For reproducible builds
-  in regulated environments, pin to digests (e.g. `node:20-alpine@sha256:...`).
-  Pinning all images to digests is tracked as a v0.6 follow-up.
-- The `ollama/ollama:latest` image is ~1.5 GB and pulls model weights on
+- **Image tags are pinned to specific releases** (no `:latest`) as of v0.6.
+  For supply-chain-grade reproducibility, also pin by sha256 digest — run:
+
+  ```bash
+  ./docker/pin-digests.sh                # print resolved digests to stdout
+  ./docker/pin-digests.sh --apply        # rewrite docker-compose.yml in place
+  ```
+
+  After `--apply`, commit the modified `docker-compose.yml` so the pinned
+  digest is part of your reviewed config. The script needs docker daemon
+  access to run `docker pull` + `docker inspect` against each image.
+- The `ollama/ollama:0.6.0` image is ~1.5 GB and pulls model weights on
   first use. For air-gapped installs, mirror the image to your internal
   registry and pre-load the model weights into `docker/data/ollama/`.
 
@@ -199,10 +207,10 @@ A few things worth doing before you put the worker behind real traffic:
   (or your platform's equivalent) onto `docker/data/audit/snapfeed.jsonl`.
   A weekly rotation with `copytruncate` is fine; the worker re-opens the
   file via the `fileAuditLog` adapter on every write.
-- **Pin image digests** for reproducibility. v0.5 uses tags
-  (`node:20-alpine`, `minio/minio:RELEASE.…`, `ollama/ollama:latest`).
-  v0.6 will publish digest pins; until then, snapshot the resolved digests
-  with `docker compose pull && docker images --digests`.
+- **Pin image digests** for reproducibility. As of v0.6 the compose file
+  pins to specific tags and ships `./docker/pin-digests.sh` for the
+  digest-pinning step (see Air-gapped notes above). For maximum
+  reproducibility, run the script with `--apply` and commit the result.
 - **Set `SNAPFEED_TRUST_PROXY=true`** only when an upstream proxy/ingress
   controls the `X-Forwarded-For` header. Default false — otherwise
   rate-limit-per-IP is bypassable.

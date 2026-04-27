@@ -47,6 +47,19 @@ export default defineConfig([
     treeshake: true,
     outDir: 'dist',
   },
+  // Server: shared security utilities — promoted to a public subpath in
+  // v0.6 so consumers can plug in custom rate-limit stores or reuse the
+  // payload validators in their own handlers without depending on the
+  // Next.js or Express integrations.
+  {
+    entry: { 'server/security': 'src/server/security.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
   // Routing module (pure config helpers, no React)
   {
     entry: { routing: 'src/routing.ts' },

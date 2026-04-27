@@ -25,11 +25,22 @@ export interface LLMFeatureToggles {
   severity?: boolean
   /** Extract reproducible steps from the payload. */
   repro?: boolean
-  // `redact` (LLM second-pass redaction) was advertised in v0.4 but never
-  // implemented at the runner level — removed in v0.5.0 to avoid a
-  // security-flavored no-op. Use `redactBeforeLLM: true` (regex + entropy +
-  // email patterns) on the top-level LLMConfig instead. A real LLM-driven
-  // redact pass is planned for v0.6.
+  /**
+   * LLM-driven second-pass redaction of `payload.text`. Catches PII / secrets
+   * the regex `redactForLLM` pass misses (names, addresses, custom IDs,
+   * phrasing-dependent context).
+   *
+   * Off by default. Pairs well with `redactBeforeLLM: true` — the regex
+   * pass runs first (so the LLM never sees raw emails / JWTs), then this
+   * feature asks the LLM to flag anything else that looks sensitive.
+   *
+   * Result lands on `LLMRunResult.redactedText` (the rewritten string)
+   * and `LLMRunResult.redactionApplied` (true if the LLM actually
+   * changed anything). Consumers decide whether to overwrite
+   * `payload.text` with the redacted version before forwarding to
+   * adapters.
+   */
+  redact?: boolean
   // dedupe + transcribe + route deferred to a later release.
 }
 
@@ -73,6 +84,20 @@ export interface LLMRunResult {
   severity?: 'p0' | 'p1' | 'p2' | 'nit'
   /** Numbered repro steps as array; undefined when disabled. */
   reproSteps?: string[]
+  /**
+   * v0.6: LLM-driven second-pass-redacted version of `payload.text`. Set
+   * only when `features.redact` is enabled AND the call succeeded. Even if
+   * the LLM decided no edits were needed, this field carries the (possibly
+   * unchanged) string so the consumer has a clear signal that the feature
+   * ran.
+   */
+  redactedText?: string
+  /**
+   * v0.6: Set alongside `redactedText`. `true` when the LLM actually
+   * changed the input, `false` when it returned the input verbatim. Useful
+   * for "skip overwrite if nothing changed" logic at the integration layer.
+   */
+  redactionApplied?: boolean
   /** Tokens consumed by this run. */
   tokensUsed: number
   /** True when one or more requested features fell back due to error/quota. */
