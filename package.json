@@ -145,6 +145,7 @@
     "docs/ARCHITECTURE.md",
     "docs/SECURITY_REPORT.md",
     "docs/customization.md",
+    "docs/adapters",
     "docs/quickstart",
     "docs/screenshots",
     "legal/DPA-template.md",

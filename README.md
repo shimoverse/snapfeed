@@ -276,33 +276,37 @@ const provider = createProvider({
 import { slackAdapter } from 'snapfeed/adapters'
 ```
 
+> **Per-adapter setup guides:** [docs/adapters/](./docs/adapters/index.md). Each one walks you through credential setup → env vars → test → common errors in 5 steps. Pair with `npx snapfeed doctor` to verify your wiring.
+
 Built-in adapters (alphabetical):
 
-| Adapter | Status | Use it for |
-|---------|--------|------------|
-| `asanaAdapter` | ✅ v0.4 | Asana task per submission, optional screenshot attachment |
-| `autoAdapters` | ✅ v0.3 | Reads `SNAPFEED_*` env vars and wires automatically |
-| `clickUpAdapter` | ✅ v0.4 | ClickUp task with per-category priority |
-| `consoleAdapter` | ✅ shipped | Local dev, debugging |
-| `discordAdapter` | ✅ v0.3 | Indie / community / OSS teams |
-| `fileAdapter` | ✅ v0.3 | Local dev, audit log, Node-only |
-| `githubAdapter` | ✅ shipped | Bug tracking when you live in GitHub |
-| `googleSheetsAdapter` | ✅ v0.3 | Lightweight tracking, non-tech editing |
-| `jiraAdapter` | ✅ v0.3 | Mid-size / corporate workflows |
-| `linearAdapter` | ✅ v0.3 | Startup / product teams |
-| `msTeamsAdapter` | ✅ v0.4 | Adaptive Card via Teams incoming webhook |
-| `notionAdapter` | ✅ v0.4 | Notion page in a database, status + category select properties |
-| `slackAdapter` | ✅ shipped | Real-time team awareness |
-| `supabaseAdapter` | ✅ shipped | Postgres-backed inbox |
-| `telegramAdapter` | ✅ shipped | Solo / lightweight notifications |
-| `webhookAdapter` | ✅ shipped | Anything else (your own backend) |
+| Adapter | Setup guide | Use it for |
+|---------|-------------|------------|
+| `asanaAdapter` | [docs/adapters/asana.md](./docs/adapters/asana.md) | Asana task per submission, optional screenshot attachment |
+| `autoAdapters` | [docs/adapters/autoAdapters.md](./docs/adapters/autoAdapters.md) | Reads `SNAPFEED_*` env vars and wires automatically |
+| `clickUpAdapter` | [docs/adapters/clickUp.md](./docs/adapters/clickUp.md) | ClickUp task with per-category priority |
+| `consoleAdapter` | [docs/adapters/console.md](./docs/adapters/console.md) | Local dev, debugging |
+| `discordAdapter` | [docs/adapters/discord.md](./docs/adapters/discord.md) | Indie / community / OSS teams |
+| `fileAdapter` | [docs/adapters/file.md](./docs/adapters/file.md) | Local dev, audit log, Node-only |
+| `githubAdapter` | [docs/adapters/github.md](./docs/adapters/github.md) | Bug tracking when you live in GitHub |
+| `googleSheetsAdapter` | [docs/adapters/googleSheets.md](./docs/adapters/googleSheets.md) | Lightweight tracking, non-tech editing |
+| `jiraAdapter` | [docs/adapters/jira.md](./docs/adapters/jira.md) | Mid-size / corporate workflows |
+| `linearAdapter` | [docs/adapters/linear.md](./docs/adapters/linear.md) | Startup / product teams |
+| `msTeamsAdapter` | [docs/adapters/msTeams.md](./docs/adapters/msTeams.md) | Adaptive Card via Teams incoming webhook |
+| `notionAdapter` | [docs/adapters/notion.md](./docs/adapters/notion.md) | Notion page in a database, status + category select properties |
+| `slackAdapter` | [docs/adapters/slack.md](./docs/adapters/slack.md) | Real-time team awareness |
+| `supabaseAdapter` | [docs/adapters/supabase.md](./docs/adapters/supabase.md) | Postgres-backed inbox |
+| `telegramAdapter` | [docs/adapters/telegram.md](./docs/adapters/telegram.md) | Solo / lightweight notifications |
+| `webhookAdapter` | [docs/adapters/webhook.md](./docs/adapters/webhook.md) | Anything else (your own backend) |
 
 ### Writing a custom adapter
 
-Adapters implement the `FeedbackAdapter` interface from `src/types.ts`:
+snapfeed ships a complete worked example: see [`examples/custom-adapter/`](./examples/custom-adapter/). It builds a Mattermost adapter end-to-end with construction-time validation, payload formatting, error handling, partial-failure surfacing, and tests. Read the example README for the six things to get right when writing your own.
+
+The minimum contract:
 
 ```ts
-import type { FeedbackAdapter } from 'snapfeed'
+import type { FeedbackAdapter } from 'snapfeed/adapters'
 
 export const myAdapter: FeedbackAdapter = {
   name: 'my-adapter',
@@ -316,7 +320,7 @@ export const myAdapter: FeedbackAdapter = {
 }
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for adapter guidelines and the test harness.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for adapter contribution guidelines and the test harness.
 
 ## Auto-adapter env vars
 

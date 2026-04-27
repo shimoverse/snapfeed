@@ -69,6 +69,8 @@ interface FeedbackAdapterResult {
 
 Adapters can run **client-side** (the widget calls `send()` directly — bad idea for any adapter that needs an API token) or **server-side** (the widget POSTs to your `apiUrl`, the handler runs adapters server-side with secrets read from `process.env`). Use server-side for anything that touches a real destination. The CLI scaffolder, the README examples, and the Docker stack all use the server-side pattern.
 
+> **Per-adapter setup guides:** [`docs/adapters/`](./adapters/index.md) ships a 5-step setup doc for every bundled adapter (credentials → env vars → test → common errors). Open the index to pick a destination, or jump direct: [Slack](./adapters/slack.md), [GitHub](./adapters/github.md), [JIRA](./adapters/jira.md), [Linear](./adapters/linear.md), [Discord](./adapters/discord.md), [Webhook](./adapters/webhook.md), [Notion](./adapters/notion.md), [Asana](./adapters/asana.md), [ClickUp](./adapters/clickUp.md), [Microsoft Teams](./adapters/msTeams.md), [Telegram](./adapters/telegram.md), [Supabase](./adapters/supabase.md), [Google Sheets](./adapters/googleSheets.md), [File JSONL](./adapters/file.md), [Console](./adapters/console.md), [`autoAdapters()`](./adapters/autoAdapters.md). Writing your own? See [`examples/custom-adapter/`](../examples/custom-adapter/).
+
 ### 1.3 Routing
 
 Routing decides *which* adapters / destinations a given payload goes to. Two tiers ship in v0.4:
