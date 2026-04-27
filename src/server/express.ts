@@ -73,6 +73,12 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
       })
       return
     }
+    // v0.7: Per-submission correlation ID. Stamped on the `feedback.received`
+    // event AND every `adapter.dispatched` event for this request, so the
+    // GDPR `deleteByUserId` helper can correlate uploads back to the
+    // user who submitted them.
+    const feedbackId = generateFeedbackId()
+
     // Audit log helper. Failures are caught and logged via `console.error` —
     // audit logging never breaks the request flow.
     const recordAudit = async (event: { type: string; [key: string]: unknown }) => {
@@ -136,6 +142,7 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
         pageUrl: normalized.pageUrl,
         reporter: normalized.user?.email ?? normalized.user?.name,
         category: normalized.category,
+        feedbackId,
       })
 
       // ── Optional pre-receive hook ──────────────────────────────────────────
@@ -167,6 +174,7 @@ export function feedbackMiddleware(config: FeedbackHandlerConfig): ExpressMiddle
             deliveryId: adapterResults[i]?.deliveryId,
             error: adapterResults[i]?.error,
             warningsCount: adapterResults[i]?.warnings?.length ?? 0,
+            feedbackId,
           })
         )
       )
@@ -209,4 +217,18 @@ function warnIfOriginsOpenInProd(config: FeedbackHandlerConfig): void {
       'effectively disabled (allow-all). Set allowedOrigins to lock down ' +
       'accepted browser origins.'
   )
+}
+
+/**
+ * Generate a feedback correlation ID. Same shape and rationale as the
+ * Next.js handler — see src/server/nextjs.ts for the full doc. Used to
+ * correlate `feedback.received` with its `adapter.dispatched` events for
+ * the GDPR `deleteByUserId` flow.
+ *
+ * @internal
+ */
+function generateFeedbackId(): string {
+  const cryptoObj = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (cryptoObj?.randomUUID) return `fbk_${cryptoObj.randomUUID()}`
+  return `fbk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }

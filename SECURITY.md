@@ -80,7 +80,7 @@ If your security team needs to approve snapfeed before adoption, here is what th
 
 ### Coming in later releases
 
-- [ ] **Retention policy.** `retentionDays` config + `deleteByUserId()` API for GDPR right-to-erasure. _Slipped to v0.6._
+- [x] **Retention policy + GDPR right-to-erasure.** Time-based retention (`pruneOlderThan({ retentionDays: N })`) shipped in v0.6. User-initiated deletion (`deleteByUserId(reporter, { auditLog, storage })`) shipped in v0.7 — see [`docs/gdpr.md`](./docs/gdpr.md).
 - [ ] **SSO/SAML for admin.** OIDC + SAML for the self-hosted admin app. _Slipped to v0.6._
 - [x] **Image digest pinning** in `docker/docker-compose.yml`. Shipped in v0.6 — compose file pins to specific tags (no `:latest`) and `./docker/pin-digests.sh` resolves + applies sha256 digests for supply-chain-grade reproducibility.
 

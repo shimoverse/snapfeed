@@ -33,7 +33,8 @@ Anything reachable from these subpath exports is part of the public API and prot
 | `snapfeed/voice` | `createVoiceRecorder`, `isVoiceSupported`, `pickSupportedMimeType` |
 | `snapfeed/screen-recording` | `createScreenRecorder`, `isScreenRecordingSupported` |
 | `snapfeed/storage` | `fileStorage`, `s3Storage` |
-| `snapfeed/audit-log` | `fileAuditLog`, `noopAuditLog`, `multiAuditLog`, `AuditLog`, `AuditEvent` |
+| `snapfeed/audit-log` | `fileAuditLog`, `noopAuditLog`, `multiAuditLog`, `AuditLog`, `AuditEvent` (incl. v0.7 `feedback.redacted` event + optional `feedbackId` field on `feedback.received`/`adapter.dispatched`); `fileAuditLog().readAll()` streaming reader |
+| `snapfeed/gdpr` | `deleteByUserId(reporter, { auditLog, storage, log? })` — walks the audit log, correlates feedback by reporter, deletes uploads, writes a `feedback.redacted` event |
 | `snapfeed/network-capture` | `installNetworkCapture` and its config interface |
 | `snapfeed/campaigns` | `defineCampaign`, `isCampaignActive`, `getCampaignTags`, `getCampaignRouting`, `campaignShareUrl`, `ReleaseCampaign` |
 | `snapfeed/theme` | Theme-token data and CSS variable names |

@@ -80,6 +80,11 @@
       "import": "./dist/audit-log.js",
       "require": "./dist/audit-log.cjs"
     },
+    "./gdpr": {
+      "types": "./dist/gdpr.d.ts",
+      "import": "./dist/gdpr.js",
+      "require": "./dist/gdpr.cjs"
+    },
     "./network-capture": {
       "types": "./dist/network-capture.d.ts",
       "import": "./dist/network-capture.js",
@@ -145,6 +150,7 @@
     "docs/ARCHITECTURE.md",
     "docs/SECURITY_REPORT.md",
     "docs/customization.md",
+    "docs/gdpr.md",
     "docs/adapters",
     "docs/quickstart",
     "docs/screenshots",

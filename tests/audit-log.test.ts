@@ -213,3 +213,189 @@ describe('multiAuditLog', () => {
     expect(good2.record).toHaveBeenCalledTimes(1)
   })
 })
+
+// ─── v0.7: GDPR foundations ─────────────────────────────────────────────────
+
+describe('AuditEvent — feedbackId field (v0.7)', () => {
+  // Background: GDPR delete-by-user needs to correlate "this user submitted
+  // feedback X" (feedback.received) with "feedback X had upload Y on
+  // adapter Z" (adapter.dispatched). The link is a feedbackId field added
+  // to BOTH event types.
+
+  it('feedback.received accepts an optional feedbackId field', () => {
+    const event: AuditEvent = {
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:00Z',
+      payloadSize: 100,
+      pageUrl: 'http://example.com',
+      feedbackId: 'fbk_abc123',
+    }
+    expect(event.feedbackId).toBe('fbk_abc123')
+  })
+
+  it('adapter.dispatched accepts an optional feedbackId field', () => {
+    const event: AuditEvent = {
+      type: 'adapter.dispatched',
+      ts: '2026-04-26T00:00:00Z',
+      adapter: 'slack',
+      ok: true,
+      durationMs: 12,
+      deliveryId: 'slack-msg-456',
+      feedbackId: 'fbk_abc123',
+    }
+    expect(event.feedbackId).toBe('fbk_abc123')
+  })
+
+  it('feedbackId persists through fileAuditLog roundtrip', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath })
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:00Z',
+      payloadSize: 100,
+      pageUrl: 'http://example.com',
+      feedbackId: 'fbk_xyz789',
+    })
+    const written = JSON.parse((await readFile(filePath, 'utf8')).trim())
+    expect(written.feedbackId).toBe('fbk_xyz789')
+  })
+
+  it('feedbackId is preserved by hashReporter (only reporter is hashed)', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath, hashReporter: true })
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:00Z',
+      payloadSize: 100,
+      pageUrl: 'http://example.com',
+      reporter: 'ananya@example.com',
+      feedbackId: 'fbk_persists_through_hash',
+    })
+    const written = JSON.parse((await readFile(filePath, 'utf8')).trim())
+    expect(written.feedbackId).toBe('fbk_persists_through_hash')
+    expect(written.reporter).not.toBe('ananya@example.com')
+    expect(written.reporter).toHaveLength(12)
+  })
+})
+
+describe('AuditEvent — feedback.redacted event (v0.7)', () => {
+  // Written by the deleteByUserId helper after a successful redaction so
+  // the audit log is itself a record of the GDPR action. The original
+  // feedback.received line stays in place (audit logs are append-only),
+  // but the redacted event signals "this user's data has been removed."
+
+  it('accepts a feedback.redacted event with reporter + counts', () => {
+    const event: AuditEvent = {
+      type: 'feedback.redacted',
+      ts: '2026-04-26T00:00:00Z',
+      reporter: 'ananya@example.com',
+      feedbackEventCount: 3,
+      uploadCount: 7,
+    }
+    expect(event.type).toBe('feedback.redacted')
+    expect(event.feedbackEventCount).toBe(3)
+    expect(event.uploadCount).toBe(7)
+  })
+
+  it('hashReporter applies to feedback.redacted too', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath, hashReporter: true })
+    await log.record({
+      type: 'feedback.redacted',
+      ts: '2026-04-26T00:00:00Z',
+      reporter: 'ananya@example.com',
+      feedbackEventCount: 2,
+      uploadCount: 5,
+    })
+    const written = JSON.parse((await readFile(filePath, 'utf8')).trim())
+    expect(written.reporter).not.toBe('ananya@example.com')
+    expect(written.reporter).toHaveLength(12)
+  })
+})
+
+describe('fileAuditLog.readAll() — streaming read API (v0.7)', () => {
+  // GDPR delete needs to walk historical events. fileAuditLog gains a
+  // streaming readAll() that yields one event per JSONL line.
+  // Optional on the AuditLog interface so existing implementations
+  // (noopAuditLog, custom) don't break.
+
+  it('streams every event from the file in order', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath })
+
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:01Z',
+      payloadSize: 100,
+      pageUrl: 'http://example.com/a',
+      feedbackId: 'fbk_one',
+    })
+    await log.record({
+      type: 'adapter.dispatched',
+      ts: '2026-04-26T00:00:02Z',
+      adapter: 'slack',
+      ok: true,
+      durationMs: 5,
+      deliveryId: 'slk_1',
+      feedbackId: 'fbk_one',
+    })
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:03Z',
+      payloadSize: 200,
+      pageUrl: 'http://example.com/b',
+      feedbackId: 'fbk_two',
+    })
+
+    const out: AuditEvent[] = []
+    if (typeof log.readAll !== 'function') throw new Error('readAll not implemented')
+    for await (const e of log.readAll()) {
+      out.push(e)
+    }
+
+    expect(out).toHaveLength(3)
+    expect(out[0]?.type).toBe('feedback.received')
+    expect(out[1]?.type).toBe('adapter.dispatched')
+    expect(out[2]?.type).toBe('feedback.received')
+  })
+
+  it('returns nothing when the audit file does not exist yet', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath })
+    if (typeof log.readAll !== 'function') throw new Error('readAll not implemented')
+
+    const out: AuditEvent[] = []
+    for await (const e of log.readAll()) out.push(e)
+    expect(out).toEqual([])
+  })
+
+  it('skips blank lines + malformed JSON lines without throwing', async () => {
+    const filePath = tmpFile()
+    const log = fileAuditLog({ path: filePath })
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:01Z',
+      payloadSize: 1,
+      pageUrl: 'http://x',
+      feedbackId: 'fbk_a',
+    })
+    const { appendFile } = await import('node:fs/promises')
+    await appendFile(filePath, '\n', 'utf8')
+    await appendFile(filePath, 'not-json{\n', 'utf8')
+    await log.record({
+      type: 'feedback.received',
+      ts: '2026-04-26T00:00:02Z',
+      payloadSize: 1,
+      pageUrl: 'http://y',
+      feedbackId: 'fbk_b',
+    })
+
+    if (typeof log.readAll !== 'function') throw new Error('readAll not implemented')
+    const out: AuditEvent[] = []
+    for await (const e of log.readAll()) out.push(e)
+
+    expect(out).toHaveLength(2)
+    expect((out[0] as { feedbackId: string }).feedbackId).toBe('fbk_a')
+    expect((out[1] as { feedbackId: string }).feedbackId).toBe('fbk_b')
+  })
+})

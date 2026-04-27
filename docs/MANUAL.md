@@ -990,6 +990,25 @@ Adapter contracts (`FeedbackAdapter`) have not changed since v0.1. Adapter *opti
 
 ---
 
+## 12.5 GDPR / right-to-erasure (v0.7)
+
+When a user asks to be forgotten, use `snapfeed/gdpr`:
+
+```ts
+import { deleteByUserId } from 'snapfeed/gdpr'
+
+const result = await deleteByUserId('ananya@example.com', {
+  auditLog: fileAuditLog({ path: '/data/audit/snapfeed.jsonl' }),
+  storage: s3Storage({ ... }),
+})
+```
+
+It walks the audit log via `feedbackId` correlation, deletes the user's uploads from storage, and writes a `feedback.redacted` audit event. Pair with `pruneOlderThan` (v0.6) for time-based retention.
+
+Full doc + caveats about third-party destinations: [`docs/gdpr.md`](./gdpr.md).
+
+---
+
 ## 13. Troubleshooting encyclopedia
 
 > **First-stop debug command: `npx snapfeed doctor`.** It prints a green/yellow/red checklist of your setup — install version, framework, destinations wired, env-var typos (with did-you-mean suggestions), Next.js handler file presence, and an optional `--probe=<url>` to verify your dev server's `/api/feedback` route is reachable. Most of the rows below are flagged automatically. Exits non-zero on failures so you can run it in CI.

@@ -132,6 +132,16 @@ export default defineConfig([
     treeshake: true,
     outDir: 'dist',
   },
+  // GDPR helpers (Node-only — depends on audit-log + storage)
+  {
+    entry: { gdpr: 'src/gdpr.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    external: ['react', 'react-dom'],
+    treeshake: true,
+    outDir: 'dist',
+  },
   // Network capture (browser-only — patches fetch + XHR)
   {
     entry: { 'network-capture': 'src/network-capture.ts' },

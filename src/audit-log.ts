@@ -33,6 +33,13 @@ export type AuditEvent =
       pageUrl: string
       reporter?: string
       category?: string
+      /**
+       * v0.7: Stable ID for this feedback submission. Same value appears on
+       * the corresponding `adapter.dispatched` events so a consumer can
+       * correlate "this user submitted feedback X" with "feedback X had
+       * upload Y on adapter Z." Used by the GDPR `deleteByUserId` helper.
+       */
+      feedbackId?: string
     }
   | {
       type: 'adapter.dispatched'
@@ -43,6 +50,8 @@ export type AuditEvent =
       deliveryId?: string
       error?: string
       warningsCount?: number
+      /** v0.7: Same value as the corresponding `feedback.received` event. */
+      feedbackId?: string
     }
   | {
       type: 'llm.called'
@@ -64,6 +73,23 @@ export type AuditEvent =
       ip?: string
       key: string
     }
+  | {
+      /**
+       * v0.7: Written by `deleteByUserId(reporter, ...)` after a successful
+       * GDPR redaction so the audit log itself records the action. The
+       * original `feedback.received` lines stay in place (audit logs are
+       * append-only); this event signals "data for this reporter has been
+       * removed from storage." Pair with `hashReporter: true` in production
+       * to keep the redacted event from re-leaking the email it removed.
+       */
+      type: 'feedback.redacted'
+      ts: string
+      reporter: string
+      /** Number of `feedback.received` events matched for this reporter. */
+      feedbackEventCount: number
+      /** Number of upload `deliveryId`s deleted from storage. */
+      uploadCount: number
+    }
 
 // Re-export so consumers wiring the handler don't need a separate import.
 export type { FeedbackPayload, FeedbackAdapterResult }
@@ -72,6 +98,14 @@ export type { FeedbackPayload, FeedbackAdapterResult }
 
 export interface AuditLog {
   record(event: AuditEvent): Promise<void>
+  /**
+   * v0.7: Optional streaming read of historical events. Implementations that
+   * cannot read back (e.g. fire-and-forget SIEM forwarders, `noopAuditLog`)
+   * should leave this undefined; callers that depend on it (e.g.
+   * `deleteByUserId`) check for its presence and surface a clear error
+   * when the audit log is write-only.
+   */
+  readAll?(): AsyncIterable<AuditEvent>
 }
 
 export interface FileAuditLogOptions {
@@ -121,6 +155,41 @@ export function fileAuditLog(options: FileAuditLogOptions = {}): AuditLog {
         console.error('[snapfeed] audit-log write failed:', err)
       }
     },
+
+    /**
+     * v0.7: Stream every event from the JSONL file in order. Yields one
+     * `AuditEvent` per non-blank line; silently skips malformed JSON
+     * (e.g. a partial write from a crashed process). Returns nothing if
+     * the file does not exist yet — that's the cold-start case.
+     *
+     * Memory: line-by-line via readline; safe against arbitrarily large
+     * audit files. Caller is responsible for `for await ... break` if it
+     * wants to stop early.
+     */
+    async *readAll(): AsyncIterable<AuditEvent> {
+      const { existsSync, createReadStream } = await import('node:fs')
+      if (!existsSync(filePath)) return
+
+      const { createInterface } = await import('node:readline')
+      const stream = createReadStream(filePath, { encoding: 'utf8' })
+      const rl = createInterface({ input: stream, crlfDelay: Infinity })
+      try {
+        for await (const rawLine of rl) {
+          const line = rawLine.trim()
+          if (!line) continue
+          try {
+            yield JSON.parse(line) as AuditEvent
+          } catch {
+            // Malformed line (partial write, manual edit, log rotation
+            // mid-line). Skip — don't poison the iterator.
+            continue
+          }
+        }
+      } finally {
+        rl.close()
+        stream.destroy()
+      }
+    },
   }
 }
 
@@ -155,11 +224,15 @@ export function multiAuditLog(...logs: AuditLog[]): AuditLog {
 // ─── Internals ────────────────────────────────────────────────────────────────
 
 async function redactReporter(event: AuditEvent): Promise<AuditEvent> {
-  // Only `feedback.received` carries a `reporter` field today. Future events
-  // can be added without touching callers.
-  if (event.type !== 'feedback.received') return event
-  if (event.reporter === undefined || event.reporter === '') return event
+  // Both `feedback.received` and (v0.7) `feedback.redacted` carry a
+  // `reporter` field. Adding an event type with a reporter? Extend this
+  // switch.
+  if (event.type !== 'feedback.received' && event.type !== 'feedback.redacted') {
+    return event
+  }
+  const reporter = event.reporter
+  if (reporter === undefined || reporter === '') return event
   const { createHash } = await import('node:crypto')
-  const hashed = createHash('sha256').update(event.reporter).digest('hex').slice(0, 12)
+  const hashed = createHash('sha256').update(reporter).digest('hex').slice(0, 12)
   return { ...event, reporter: hashed }
 }
