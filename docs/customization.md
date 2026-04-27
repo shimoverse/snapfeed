@@ -4,6 +4,10 @@
 
 snapfeed ships with a polished default widget — drop in `<FeedbackProvider>` and you have a working feedback flow. But every product has its own design language, and the widget should look like *yours*, not ours.
 
+![Default snapfeed widget — modal open with empty form, category chips, and auto-captured screenshot](./screenshots/widget-open-empty.png)
+
+> The default modal as it appears out of the box (`accentColor: "#B85A36"`, `theme: "auto"`). Levels 1–4 below show how to peel back any layer of this.
+
 This guide walks through four levels of customization, ordered from "5-minute rebrand" to "render anything you want."
 
 ## The four levels at a glance

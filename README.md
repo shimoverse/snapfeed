@@ -11,6 +11,10 @@ snapfeed is the feedback widget for the people *inside* your build — testers, 
 
 Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your own team to actually file bugs while they're testing — keep reading.
 
+![snapfeed widget — closed state with floating trigger button](./docs/screenshots/widget-closed.png)
+
+> The floating trigger sits in the corner. Hotkey, click, or programmatic open — same form. (Above: the `examples/vite-react` demo. Capture script: [`scripts/capture-screenshots.mjs`](./scripts/capture-screenshots.mjs).)
+
 ## Pick your mode
 
 | Mode | For | Setup |
@@ -67,6 +71,11 @@ The auto-adapter detects `SNAPFEED_*` env vars and wires them. **Note**: only th
 
 ## What it does (the customer journey)
 
+| 1. Open | 2. Describe | 3. Sent |
+|---|---|---|
+| ![Open: empty form with category chips and auto-captured screenshot](./docs/screenshots/widget-open-empty.png) | ![Describe: bug category picked + one-sentence repro](./docs/screenshots/widget-open-filled.png) | ![Sent: confirmation surface](./docs/screenshots/widget-success.png) |
+| Hotkey or click. The form mounts with auto-captured screenshot, identity prefilled, and category chips. | Pick a category, type one sentence. Screenshot annotation, voice, and console-error attachment all happen here. | Routes to Slack/JIRA/Linear/etc. server-side. Reporter sees the confirmation; PM sees the ticket. |
+
 **Reporter — Ananya, designer reviewing a staging build.** She spots a confusing checkbox label on the payment step. Ctrl+Shift+F. Types one sentence, pastes a screenshot, draws a red arrow. Send. She never opened JIRA, never picked a project, never tagged a team.
 
 **PM — Raj, owns checkout.** Two minutes later the bug shows up in `#checkout-feedback` on Slack with screenshot, URL, viewport, and build ID. The same item is a JIRA ticket in his project, pre-labeled `bug` and `checkout`. He didn't file it himself.
@@ -97,7 +106,7 @@ cp .env.example .env
 docker compose up
 ```
 
-Then point the widget at `http://<host>:8787/feedback`. Add `--profile llm` to also start a local Ollama. See [docker/README.md](./docker/README.md). Postgres-backed inbox + admin UI ship in **v0.6**.
+Then point the widget at `http://<host>:8787/feedback`. Add `--profile llm` to also start a local Ollama. See [docker/README.md](./docker/README.md). Postgres-backed inbox + admin write-back are slated for **v0.7**.
 
 For deployments where you'd rather host the worker yourself in your existing Node app:
 
@@ -120,7 +129,7 @@ export const POST = createFeedbackHandler({
 ```
 
 ### 🔒 Air-gapped
-For corporates and regulated industries where every new outbound domain needs a security review. v0.5 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. Image-digest pinning + signed tarball + SSO/SAML for the admin app are slated for **v0.6** (see [SECURITY.md](./SECURITY.md) §Coming in later releases).
+For corporates and regulated industries where every new outbound domain needs a security review. v0.5 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. **Image-digest pinning shipped in v0.6** (run `./docker/pin-digests.sh --apply`); signed tarball + SSO/SAML for the admin app are slated for **v0.7** (see [SECURITY.md](./SECURITY.md) §Coming in later releases).
 
 ## Persona picker
 
@@ -179,7 +188,7 @@ Use the `metadata.custom` field on every payload — that's the sanctioned exten
 <FeedbackProvider
   appName="Checkout"
   user={{ name: user?.name, email: user?.email }}
-  // The provider doesn't have first-class buildId/gitSha props yet (planned for v0.6).
+  // The provider doesn't have first-class buildId/gitSha props yet (slated for v0.7).
   // Pass via `metadata.custom` on submit using the onReceive hook in your handler,
   // or set them as data-* attributes you read in your own onReceive callback:
   onSuccess={(payload) => console.log('sent', payload)}
@@ -207,7 +216,7 @@ createFeedbackHandler({
 })
 ```
 
-First-class top-level props (`buildId`, `gitSha`, `env`) ship in **v0.6**.
+First-class top-level props (`buildId`, `gitSha`, `env`) are slated for **v0.7**.
 
 ### Routing config
 
@@ -246,7 +255,7 @@ import { createProvider, applyLLM } from 'snapfeed/llm'
 
 const provider = createProvider({
   enabled: true,
-  provider: 'anthropic', // 'anthropic' | 'openai' | 'ollama'  (azure via 'openai' baseURL; bedrock + 'custom' on the v0.6 roadmap)
+  provider: 'anthropic', // 'anthropic' | 'openai' | 'ollama'  (azure via 'openai' baseURL; bedrock + 'custom' on the v0.7 roadmap)
   apiKey: process.env.ANTHROPIC_API_KEY!,
   features: { title: true, severity: true, repro: true },
   redactBeforeLLM: true,
@@ -396,8 +405,9 @@ See [docs/customization.md](./docs/customization.md) for the full guide and Tail
 |-------|--------|------------|
 | v0.3 | shipped | Hygiene, file/auto/jira/linear/sheets/discord adapters, routing config, CLI, runnable Next.js example |
 | v0.4 | shipped | MS Teams / Asana / ClickUp / Notion adapters; LLM (BYOK — Anthropic, OpenAI, Azure, Ollama); voice capture; screen recording; storage adapters (file, S3-compatible); spreadsheet-backed routing source (Sheets, CSV); audit log; network capture; Release Campaigns; Docker compose self-host stack; minimal admin viewer |
-| v0.5 (this release) | now | UI customization layer (`snapfeed/theme` + `snapfeed/headless`); admin dashboard upgrade (filters, bulk actions, dashboard view, audit view, saved views); full doc pack (PRD, Playbook, Manual, Architecture, Security Report, Hardening guide, 6 persona quickstarts); ESLint + Prettier + size-limit; Vite + Remix examples; F-002 / F-003 fixed |
-| v0.6 |  | Postgres-backed inbox + admin write-back; first-class `buildId`/`gitSha`/`env` provider props; built-in OIDC for admin; image-digest pinning; SBOM per release |
+| v0.5 | shipped | UI customization layer (`snapfeed/theme` + `snapfeed/headless`); admin dashboard upgrade (filters, bulk actions, dashboard view, audit view, saved views); full doc pack (PRD, Playbook, Manual, Architecture, Security Report, Hardening guide, 6 persona quickstarts); ESLint + Prettier + size-limit; Vite + Remix examples |
+| v0.6 (this release) | now | Main-barrel split for browser tree-shaking (`snapfeed/adapters` + `snapfeed/server/security`); time-based storage retention (`StorageAdapter.delete` / `listOlderThan`, `pruneOlderThan` helper) for fileStorage + s3Storage; LLM `features.redact` (second-pass redaction); real React widget tests via jsdom + @testing-library/react; Docker image-digest pinning runbook (`docker/pin-digests.sh`); README screenshots / visual walkthroughs |
+| v0.7 |  | Postgres-backed inbox + admin write-back; first-class `buildId` / `gitSha` / `env` provider props; built-in OIDC + SAML for admin; SBOM CI workflow; signed offline tarball; GDPR `deleteByUserId` helper (built on v0.6 retention primitives); Bedrock + custom LLM providers |
 | v1.0 |  | React Native SDK + shake-to-report; Vue / Svelte clients (extract `@snapfeed/core` headless package first); plugin marketplace pattern; ServiceNow / Azure DevOps / Trello adapters |
 
 ## Examples

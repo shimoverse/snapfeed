@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vite-react-example",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "examples/vite-react", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}
