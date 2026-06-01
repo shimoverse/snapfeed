@@ -1,19 +1,21 @@
 # snapfeed
 
-> One-tap feedback for internal dogfooding. See it → tap → talk → done.
+> Agent-ready feedback loops for internal dogfooding. See it → report it → route it → fix it.
 
 [![npm](https://img.shields.io/npm/v/snapfeed.svg)](https://www.npmjs.com/package/snapfeed)
 [![license](https://img.shields.io/npm/l/snapfeed.svg)](./LICENSE)
 [![CI](https://github.com/shimoverse/snapfeed/actions/workflows/ci.yml/badge.svg)](https://github.com/shimoverse/snapfeed/actions)
 [![types](https://img.shields.io/badge/types-built--in-blue)](#)
 
-snapfeed is the feedback widget for the people *inside* your build — testers, employees, peers, beta users. The kind who shouldn't have to pick a category, write a polished description, guess who owns the feature, choose between Slack and JIRA, and format a ticket properly. They press a hotkey, type or talk, hit send. snapfeed handles routing, formatting, and context attachment.
+snapfeed is a feedback capture layer for teams where humans and agents both review software. A tester, designer, PM agent, QA agent, or design-review agent spots something in the product, opens the widget, sends one sentence, and snapfeed turns that moment into structured feedback with screenshot, URL, viewport, console errors, reporter identity, and build context.
 
-Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your own team to actually file bugs while they're testing — keep reading.
+Use it as the intake pipe for an agentic product loop: review agent finds the issue, snapfeed routes the payload, your orchestrator wakes the right coding agent, and the fix can move into test and deployment. Humans can use the same widget, but the architecture assumes the next reviewer might be Hermes, OpenClaw, Codex, Claude Code, OpenCode, a PM agent, or a QA/design agent.
+
+Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your team and agents to file high-context bugs while they test — keep reading.
 
 ![snapfeed animated demo — hotkey opens feedback widget, reporter types one sentence, screenshot and context are attached, and the item is routed to the team](./docs/screenshots/snapfeed-demo.gif)
 
-> In one minute: a tester spots an issue, opens snapfeed from the hotkey or floating trigger, types a sentence, and the server route turns it into structured feedback for Slack/JIRA/Linear/GitHub/webhooks — with screenshot and page context attached.
+> In one minute: a human or agent reviewer spots an issue, opens snapfeed from the hotkey or floating trigger, adds a sentence, and the server route sends structured feedback to Slack/JIRA/Linear/GitHub/webhooks or your agent orchestrator.
 
 ## Pick your mode
 
@@ -32,6 +34,49 @@ Same widget. Different backend topology. Pick based on what your IT will approve
 3. **Ship it safely:** follow the [production checklist](./docs/PRODUCTION_CHECKLIST.md) before enabling the widget beyond local/staging.
 
 **Per-persona quickstart guides** (5 min → 1 hour, copy-paste runnable): see [docs/quickstart/](./docs/quickstart/index.md) for indie, startup, mid-size, corp, OSS-maintainer, and designer walkthroughs.
+
+## Agent-ready feedback loops
+
+Most feedback tools assume a human PM reads the ticket later. snapfeed assumes you may already have a full agent architecture:
+
+| Reviewer | What they inspect | Where snapfeed sends it |
+|---|---|---|
+| QA agent | broken flows, failed checks, regressions | GitHub Issue, Linear/JIRA bug, webhook to orchestrator |
+| Design agent | layout, copy, accessibility, visual diffs | Slack/design channel, design QA queue, webhook |
+| PM agent | acceptance criteria, launch blockers, prioritization | roadmap board, issue tracker, triage inbox |
+| Human tester/designer | anything that feels wrong in the actual product | the same route, same payload, same audit trail |
+
+The usual loop looks like this:
+
+```text
+reviewer agent or human
+  → snapfeed widget / feedback API
+  → /api/feedback with screenshot + URL + metadata
+  → Slack/JIRA/Linear/GitHub/webhook
+  → orchestrator assigns coding agent
+  → fix PR → tests → deployment
+```
+
+snapfeed is not the orchestrator and does not auto-deploy by itself. It is the structured feedback handoff. Point `webhookAdapter` at Hermes, OpenClaw, your queue, or your own orchestration layer when you want feedback to trigger an agent run.
+
+### Agent install and verification checklist
+
+If you are an AI coding agent adding snapfeed to a repo, do this in order:
+
+1. Read [`AGENTS.md`](./AGENTS.md) for the deterministic install path.
+2. Run `npm install snapfeed` and `npx snapfeed init --yes`.
+3. Mount `<FeedbackProvider>` in the app root and pass authenticated `user` data if available.
+4. Configure one destination. For an agent loop, use `SNAPFEED_WEBHOOK_URL` or a custom adapter that posts to your orchestrator.
+5. Run `npx snapfeed doctor`, then `npx snapfeed doctor --prod` before enabling production.
+6. Smoke test the handler:
+
+```bash
+curl -X POST http://localhost:3000/api/feedback \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"agent smoke test","appName":"MyApp","pageUrl":"http://localhost:3000","pageName":"Home","timestamp":"2026-04-26T12:00:00Z"}'
+```
+
+Success means the app accepted structured feedback. A real message/ticket/webhook delivery means your routing works. For production, verify the destination payload reaches the agent queue and that your coding agent can map the feedback to a repo, branch, test command, and deployment policy.
 
 ## 60-second quickstart (zero config)
 
@@ -77,20 +122,20 @@ The auto-adapter detects `SNAPFEED_*` env vars and wires them. **Note**: only th
 
 > **Stuck? Run `npx snapfeed doctor`.** It prints a green/yellow/red checklist of your setup — install version, framework, destinations wired, env-var typos (with did-you-mean suggestions), handler file presence, and an optional `--probe=<url>` to check your dev server's `/api/feedback` route is reachable. Before shipping beyond local/staging, run `npx snapfeed doctor --prod` to also check for explicit `allowedOrigins` and `rateLimit` guardrails. **Always your first-stop debug command.**
 
-## What it does (the customer journey)
+## What it does (the review journey)
 
-| 1. Open | 2. Describe | 3. Sent |
+| 1. Open | 2. Describe | 3. Routed |
 |---|---|---|
 | ![Open: empty form with category chips and auto-captured screenshot](./docs/screenshots/widget-open-empty.png) | ![Describe: bug category picked + one-sentence repro](./docs/screenshots/widget-open-filled.png) | ![Sent: confirmation surface](./docs/screenshots/widget-success.png) |
-| Hotkey or click. The form mounts with auto-captured screenshot, identity prefilled, and category chips. | Pick a category, type one sentence. Screenshot annotation, voice, and console-error attachment all happen here. | Routes to Slack/JIRA/Linear/etc. server-side. Reporter sees the confirmation; PM sees the ticket. |
+| Hotkey, click, or API trigger. The form mounts with screenshot, identity, page context, and category chips. | A human or reviewer agent adds one sentence. Screenshot annotation, voice, and console-error attachment can happen here. | Routes server-side to Slack/JIRA/Linear/GitHub/webhook. The reporter sees confirmation; your PM/QA/design/coding agents get the work item. |
 
-**Reporter — Ananya, designer reviewing a staging build.** She spots a confusing checkbox label on the payment step. Ctrl+Shift+F. Types one sentence, pastes a screenshot, draws a red arrow. Send. She never opened JIRA, never picked a project, never tagged a team.
+**Design-review agent.** It finishes reviewing a staging build and flags a confusing checkbox label on the payment step. snapfeed captures the screen, URL, viewport, build metadata, and the agent's note.
 
-**PM — Raj, owns checkout.** Two minutes later the bug shows up in `#checkout-feedback` on Slack with screenshot, URL, viewport, and build ID. The same item is a JIRA ticket in his project, pre-labeled `bug` and `checkout`. He didn't file it himself.
+**PM agent.** It receives the routed item in Linear or JIRA, checks it against acceptance criteria, and decides whether it blocks launch or goes into backlog.
 
-**Engineer — Mei, on-call for payments.** Her JIRA ticket already has the console error, the user agent (Firefox 121 / Windows), and a link to the build. No "what browser were you on?" round-trip. She reproduces in five minutes.
+**Coding agent.** Your orchestrator turns the feedback into a repo task: branch, reproduce, fix, run tests, open PR. snapfeed supplies the context; your agent stack owns the remediation policy.
 
-**Release manager — Kenji, shipping Friday.** He opens the admin page (or the Slack channel) and sees twelve items from this week's beta cohort. Filters by team, marks four resolved, exports the rest as CSV for the retro. The widget never appeared for end customers — `enableInProduction: false` plus a role check on his side.
+**Human tester.** A designer, PM, beta user, or employee can use the exact same flow. They do not need to know which agent owns checkout, which board to file in, or what metadata the engineer needs.
 
 ## The three modes in detail
 
@@ -397,6 +442,7 @@ Honest read of where snapfeed sits on mobile. The widget is React DOM-based — 
 
 | | |
 |---|---|
+| Agent integration brief | [AGENTS.md](./AGENTS.md) |
 | Quickstart guides (6 personas) | [docs/quickstart/](./docs/quickstart/index.md) |
 | Full reference manual | [docs/MANUAL.md](./docs/MANUAL.md) |
 | Adoption playbook (30/60/90 day) | [docs/PLAYBOOK.md](./docs/PLAYBOOK.md) |
@@ -450,7 +496,7 @@ Honest read of where snapfeed sits on mobile. The widget is React DOM-based — 
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). We welcome adapters, accessibility fixes, framework ports, and translations.
+See [CONTRIBUTING.md](./CONTRIBUTING.md). We welcome adapters, accessibility fixes, framework ports, translations, and orchestration examples that show how snapfeed connects to Hermes, OpenClaw, Codex, Claude Code, OpenCode, or your own agent runner.
 
 ## Code of conduct
 
