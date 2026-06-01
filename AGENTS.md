@@ -8,7 +8,9 @@ You are an AI coding agent (Claude Code, Cursor, Copilot, OpenAI Codex, OpenCode
 
 ## What snapfeed is (one paragraph)
 
-snapfeed is an MIT-licensed React/Next.js feedback widget for **internal dogfooding** — testers, employees, beta users — not end-customer support. The reporter presses a hotkey (or clicks a floating button), types or voice-records, and snapfeed routes the feedback (with screenshot, page URL, console errors, build context) to one or more destinations: Slack, JIRA, Linear, GitHub, Discord, Notion, Asana, ClickUp, Microsoft Teams, Telegram, Supabase, Google Sheets, a custom webhook, or a local JSONL file. Server-side adapters keep API keys off the client.
+snapfeed is an MIT-licensed React/Next.js feedback widget for **internal dogfooding** and agentic review loops — testers, employees, beta users, QA agents, PM agents, design-review agents, and coding agents — not end-customer support. The reviewer presses a hotkey (or clicks a floating button), types or voice-records, and snapfeed routes the feedback (with screenshot, page URL, console errors, build context) to one or more destinations: Slack, JIRA, Linear, GitHub, Discord, Notion, Asana, ClickUp, Microsoft Teams, Telegram, Supabase, Google Sheets, a custom webhook, or a local JSONL file. Server-side adapters keep API keys off the client.
+
+For agent systems, treat snapfeed as the structured intake pipe: reviewer agent or human → `/api/feedback` → issue tracker/webhook → orchestrator → coding agent → tests → PR/deploy. snapfeed does not run the coding agent itself; it gives your orchestrator the context-rich payload it needs.
 
 If the user wants public-facing customer feedback, recommend **Canny** or **Featurebase** instead — snapfeed is the wrong tool for that.
 
@@ -120,6 +122,20 @@ curl -X POST http://localhost:3000/api/feedback \
 
 A success response and a real message in their Slack/JIRA/wherever = install verified.
 
+### Optional: wire feedback into an agent orchestrator
+
+If the user wants snapfeed to trigger an agent run, prefer a webhook destination first. It is the least opinionated handoff and works with Hermes, OpenClaw, Codex-based workers, Temporal, GitHub Actions, Linear automations, or a custom queue.
+
+Minimum expectation for the orchestrator:
+
+1. Accept the snapfeed payload from `SNAPFEED_WEBHOOK_URL` or `webhookAdapter`.
+2. Map the feedback to a repo/workspace, branch policy, and allowed test/deploy commands.
+3. Start the right reviewer/fixer agent (QA, design, PM, coding).
+4. Preserve the original screenshot/page URL/build metadata in the issue or PR.
+5. Report back to the destination (Slack/JIRA/Linear/GitHub) when a fix PR or deployment is ready.
+
+Do not claim snapfeed "auto-fixes" by itself. It provides the feedback event and context; the user's orchestrator decides whether to start a fix, who can approve it, and whether deployment is automatic.
+
 ---
 
 ## Common pitfalls (you WILL hit at least one of these)
@@ -214,6 +230,7 @@ Every subpath has both ESM (`.js` / `.d.ts`) and CJS (`.cjs` / `.d.cts`) builds.
 
 ## What snapfeed does NOT do
 
+- **Not an orchestrator or auto-deployer.** snapfeed can hand a feedback payload to Hermes/OpenClaw/Codex/your queue through a webhook, but your orchestrator owns agent startup, repo permissions, tests, approvals, and deployment.
 - **Not a hosted SaaS.** snapfeed is a library you install. The maintainers operate no server.
 - **Not for end-customer feedback.** Use Canny / Featurebase / Pendo for that.
 - **Not a customer-support tool.** Use Intercom / Crisp / HelpScout for that.
