@@ -13,6 +13,7 @@ import {
   detectFramework,
   classifyEnvVars,
   formatReport,
+  scanHandlerSourceForProductionGuards,
   type DoctorReport,
   type CheckResult,
 } from '../src/cli-doctor'
@@ -148,6 +149,49 @@ describe('classifyEnvVars', () => {
     })
     expect(result.detected).not.toContain('github')
     expect(result.partial).toContain('github')
+  })
+})
+
+describe('scanHandlerSourceForProductionGuards', () => {
+  it('detects active allowedOrigins and rateLimit guards', () => {
+    const result = scanHandlerSourceForProductionGuards(`
+      export const POST = createFeedbackHandler({
+        adapters: autoAdapters(),
+        rateLimit: { max: 10, windowMs: 60_000 },
+        allowedOrigins: ['https://staging.example.com'],
+      })
+    `)
+
+    expect(result).toEqual({ hasAllowedOrigins: true, hasRateLimit: true })
+  })
+
+  it('detects shorthand guard properties from the init scaffold', () => {
+    const result = scanHandlerSourceForProductionGuards(`
+      const allowedOrigins = (process.env.SNAPFEED_ALLOWED_ORIGINS ?? '')
+        .split(',')
+        .filter(Boolean)
+      const rateLimit = { max: 10, windowMs: 60_000 }
+
+      export const POST = createFeedbackHandler({
+        adapters: autoAdapters(),
+        allowedOrigins,
+        rateLimit,
+      })
+    `)
+
+    expect(result).toEqual({ hasAllowedOrigins: true, hasRateLimit: true })
+  })
+
+  it('ignores guards that are only commented examples', () => {
+    const result = scanHandlerSourceForProductionGuards(`
+      export const POST = createFeedbackHandler({
+        adapters: autoAdapters(),
+        // rateLimit: { max: 10, windowMs: 60_000 },
+        // allowedOrigins: ['https://your-app.com'],
+      })
+    `)
+
+    expect(result).toEqual({ hasAllowedOrigins: false, hasRateLimit: false })
   })
 })
 

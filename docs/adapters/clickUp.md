@@ -35,7 +35,7 @@ The user attached to the API token must have access to this list — otherwise t
 ClickUp is wired explicitly (it has no auto-detect path):
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { clickUpAdapter } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

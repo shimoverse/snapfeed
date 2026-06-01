@@ -15,8 +15,8 @@ authors:
     orcid: ""
 repository-code: "https://github.com/shimoverse/snapfeed"
 license: MIT
-version: 0.5.3
-date-released: 2026-04-26
+version: 0.6.0
+date-released: 2026-06-01
 keywords:
   - feedback
   - dogfooding

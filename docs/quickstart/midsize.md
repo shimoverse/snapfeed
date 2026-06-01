@@ -3,7 +3,7 @@
 **Persona:** Engineering manager or tech lead at a 50–500 person company. Stack: JIRA Cloud + Slack. IT reviews new tools but you don't have full corp lockdown. Probably running on AWS/GCP/Azure, behind your usual ingress.
 **Goal:** Self-hosted Docker stack inside your VPC. Every piece of feedback creates a JIRA issue (with screenshot, build SHA, reporter), posts to a Slack channel for awareness, and writes one line per dispatch to an append-only audit log.
 **Time budget:** 1 hour, including JIRA token provisioning and a smoke test.
-**snapfeed version:** v0.5.x
+**snapfeed version:** v0.6.0
 
 ---
 
@@ -14,7 +14,7 @@ You don't need the source for runtime — you'll install snapfeed via npm in you
 ```bash
 git clone https://github.com/shimoverse/snapfeed.git
 cd snapfeed
-git checkout v0.5.3
+git checkout v0.6.0
 ```
 
 You can pin to a tag here so you control upgrades. The Docker image is built locally from the source — there is no pre-built image on Docker Hub yet.
@@ -126,7 +126,7 @@ curl http://localhost:8787/healthz
 Expected response:
 
 ```json
-{ "ok": true, "version": "0.5.3", "adapters": ["slack", "jira"], "auditLog": "/data/audit/snapfeed.jsonl", "uploadDir": "/data/uploads" }
+{ "ok": true, "version": "0.6.0", "adapters": ["slack", "jira"], "auditLog": "/data/audit/snapfeed.jsonl", "uploadDir": "/data/uploads" }
 ```
 
 If `adapters` is empty or missing entries, your `.env` values aren't being read or the JIRA snippet didn't get committed to `worker.cjs`. Check `docker compose logs worker`.

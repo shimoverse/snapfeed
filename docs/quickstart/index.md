@@ -27,7 +27,7 @@ If you're not sure where you fit:
 - **Every guide ends with a "Verify it works" section** listing the exact signals to look for after install.
 - **Every guide ends with a "Troubleshooting" table** covering the most likely failure modes with fixes.
 - **All code blocks are copy-paste runnable** from a fresh project root.
-- **Pinned to snapfeed v0.5.3.** When you see API names like `autoAdapters`, `defineRouting`, `createFeedbackHandler`, those are the real exports — not invented for the docs.
+- **Pinned to snapfeed v0.6.0.** When you see API names like `autoAdapters`, `defineRouting`, `createFeedbackHandler`, those are the real exports — not invented for the docs.
 
 ## Reference docs
 

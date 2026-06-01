@@ -92,4 +92,4 @@ The complete list of dev dependencies is in `package.json` `devDependencies`. No
 
 Per the MIT license terms of each package above, consumers redistributing snapfeed (e.g. inside a built product) should preserve the upstream copyright notices for any package whose code ends up in the redistributed binary. Because snapfeed only declares peers — it does not bundle the peer code — the obligation to attribute follows whatever bundling decisions the consumer makes.
 
-If your organization requires a Software Bill of Materials, `npm sbom` (planned for v0.5) will produce a CycloneDX-formatted SBOM per release. In the meantime, `npm ls --json` from a snapfeed-installed project will list the resolved tree.
+If your organization requires a Software Bill of Materials, `npm sbom` can produce a CycloneDX-formatted SBOM per release. In the meantime, `npm ls --json` from a snapfeed-installed project will list the resolved tree.

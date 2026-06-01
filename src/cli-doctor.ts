@@ -237,6 +237,34 @@ export interface DoctorOptions {
    * `/api/feedback` route. Skipped if undefined.
    */
   probeUrl?: string
+  /**
+   * Enables stricter static checks intended for release/staging/production
+   * readiness. This does not execute user code; it scans generated handler
+   * files for the guardrails snapfeed expects in production deployments.
+   */
+  production?: boolean
+}
+
+export interface ProductionGuardScan {
+  hasAllowedOrigins: boolean
+  hasRateLimit: boolean
+}
+
+/**
+ * Best-effort static scan for production guardrails in a feedback handler.
+ * It deliberately ignores single-line comments so scaffolded examples like
+ * `// rateLimit: ...` do not count as real protection.
+ */
+export function scanHandlerSourceForProductionGuards(source: string): ProductionGuardScan {
+  const uncommented = source
+    .split(/\r?\n/u)
+    .map(line => line.replace(/\/\/.*$/u, ''))
+    .join('\n')
+
+  return {
+    hasAllowedOrigins: /\ballowedOrigins\b\s*(?::|,)/u.test(uncommented),
+    hasRateLimit: /\brateLimit\b\s*(?::|,)/u.test(uncommented),
+  }
 }
 
 /**
@@ -428,6 +456,35 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorReport> {
         status: 'ok',
         message: `Handler file present: ${found}`,
       })
+
+      if (opts.production) {
+        try {
+          const source = readFileSync(join(opts.cwd, found), 'utf8')
+          const guards = scanHandlerSourceForProductionGuards(source)
+          const missing: string[] = []
+          if (!guards.hasAllowedOrigins) missing.push('allowedOrigins')
+          if (!guards.hasRateLimit) missing.push('rateLimit')
+          checks.push({
+            name: 'production-guards',
+            status: missing.length === 0 ? 'ok' : 'fail',
+            message:
+              missing.length === 0
+                ? 'Production guardrails present: allowedOrigins and rateLimit'
+                : `Production guardrails missing in ${found}: ${missing.join(', ')}`,
+            ...(missing.length === 0
+              ? {}
+              : {
+                  hint: 'Add an explicit origin allowlist and rateLimit before enabling snapfeed in production.',
+                }),
+          })
+        } catch {
+          checks.push({
+            name: 'production-guards',
+            status: 'warn',
+            message: `Could not read ${found} to verify production guardrails`,
+          })
+        }
+      }
     } else {
       checks.push({
         name: 'handler',

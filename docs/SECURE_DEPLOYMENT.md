@@ -4,7 +4,7 @@
 
 This is a checklist, not prose. Tick items as you complete them. The defaults snapfeed ships are safe for development; the items below are what you add for production.
 
-Last updated: 2026-04-26 (snapfeed v0.5.3)
+Last updated: 2026-06-01 (snapfeed v0.6.0)
 
 ---
 
@@ -12,16 +12,16 @@ Last updated: 2026-04-26 (snapfeed v0.5.3)
 
 ### Image build hardening
 
-- [ ] Build the worker image from `docker/Dockerfile` in your own pipeline (do not pull pre-built images from public registries until v0.5 publishes signed tarballs).
+- [ ] Build the worker image from `docker/Dockerfile` in your own pipeline (do not pull pre-built images from public registries unless your organization has verified the image provenance).
 - [ ] Pin the `node:20-alpine` base image to a digest in your fork of `docker/Dockerfile`:
       ```dockerfile
       FROM node:20-alpine@sha256:<your-pinned-digest> AS builder
       ```
 - [ ] Sign your built image with `cosign`:
       ```bash
-      cosign sign --key <kms-key> registry.your-corp.com/snapfeed/worker:0.5.3
+      cosign sign --key <kms-key> registry.your-corp.com/snapfeed/worker:0.6.0
       ```
-- [ ] Generate an SBOM at build time (until v0.5 ships one in the upstream release):
+- [ ] Generate an SBOM at build time (until upstream release automation publishes one):
       ```bash
       npm sbom --sbom-format=spdx --omit=dev > snapfeed-sbom.spdx.json
       ```
@@ -167,7 +167,7 @@ server {
 
 ## 5. Authentication
 
-### Admin app (until v0.5 ships built-in OIDC)
+### Admin app (until built-in OIDC ships)
 
 - [ ] Front the admin viewer with `oauth2-proxy` + your IdP (Okta, Azure AD, Auth0, Google Workspace).
 - [ ] Service-principal accounts only — no shared logins.
@@ -190,18 +190,18 @@ server {
 
 ---
 
-## 6. Authorization (post-v0.5 placeholder)
+## 6. Authorization
 
 Currently:
 - The admin app has placeholder auth — wire your reverse proxy.
 - The worker handler has no role model — every authenticated caller has the same write capability.
 
-In v0.5:
-- Built-in OIDC + SAML for the admin UI.
-- Role-based filtering of admin reads.
-- Per-route authorization hooks on the handler.
+Current production guidance:
+- Keep the admin viewer behind your existing reverse-proxy SSO/OIDC layer.
+- Enforce RBAC at the proxy or ingress before traffic reaches the admin app (for example, require `X-Auth-Roles: snapfeed-admin`).
+- Gate the feedback route with your app's existing same-origin session/auth checks before calling the handler when role-level restrictions matter.
 
-If you need a v0.4 stopgap, gate the admin app at the reverse proxy with header-based RBAC (e.g. `X-Auth-Roles: snapfeed-admin`) and reject the request before it reaches the app.
+Built-in OIDC/SAML, role-based admin filtering, and per-route authorization hooks remain roadmap items; do not assume they are available in v0.6.
 
 ---
 
@@ -210,7 +210,7 @@ If you need a v0.4 stopgap, gate the admin app at the reverse proxy with header-
 ### Metrics
 
 - v0.4: no Prometheus scrape endpoint. Parse the audit log JSONL.
-- v0.5: planned `/metrics` endpoint exposing `feedback_received_total`, `adapter_dispatched_total{adapter,ok}`, `llm_called_total{provider,degraded}`, `rate_limit_hit_total`.
+- Planned `/metrics` endpoint exposing `feedback_received_total`, `adapter_dispatched_total{adapter,ok}`, `llm_called_total{provider,degraded}`, `rate_limit_hit_total`.
 
 ### Alerts
 
@@ -248,7 +248,7 @@ Wire alerts on:
 ## 9. Updates
 
 - [ ] Subscribe to GitHub Releases for `shimoverse/snapfeed` (RSS or webhook).
-- [ ] Pin to a minor version range in `package.json`: `"snapfeed": "^0.5.3"` — accepts patch updates, blocks minors that may include breaking changes.
+- [ ] Pin to a minor version range in `package.json`: `"snapfeed": "^0.6.0"` — accepts patch updates, blocks minors that may include breaking changes.
 - [ ] Change-management ticket required for major-version bumps. Review `CHANGELOG.md` for breaking changes and run your full test suite against the new version in staging first.
 - [ ] **Security patches:** maintain a hotfix branch in your fork. On a CVE in snapfeed or a runtime dep, cherry-pick the fix, build, redeploy within your patch SLA.
 - [ ] Subscribe to `npm audit` notifications via your dependency scanner (Dependabot, Snyk, Renovate) so you see runtime CVEs the day they land.
@@ -355,7 +355,7 @@ services:
 $ curl -s https://feedback.internal.your-corp.com/healthz | jq
 {
   "ok": true,
-  "version": "0.5.3",
+  "version": "0.6.0",
   "adapters": ["slack", "jira", "file"],
   "auditLog": "/data/audit/snapfeed.jsonl",
   "uploadDir": "/data/uploads"

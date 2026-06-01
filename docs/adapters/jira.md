@@ -22,7 +22,7 @@ The user account whose token you use must have at least **Browse projects** + **
 snapfeed does **not** auto-detect JIRA — there's no `autoAdapters()` env-var convention for it. Wire it explicitly in your handler:
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { jiraAdapter } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

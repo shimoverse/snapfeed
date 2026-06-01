@@ -1,6 +1,6 @@
 # Compatibility
 
-Browser, runtime, and framework compatibility for snapfeed v0.5.3.
+Browser, runtime, and framework compatibility for snapfeed v0.6.0.
 
 > If your environment isn't listed below, it probably still works — snapfeed targets standard Web Platform APIs (`fetch`, `MediaRecorder`, `getDisplayMedia`, `TextEncoder`) on the browser side and standard Node ESM/CJS interop on the server side. The matrices below cover what we actively test or have user reports for.
 
@@ -62,8 +62,8 @@ The `utf8ByteLength` cross-runtime helper is in `src/server/security.ts`.
 |---|---|---|---|---|
 | Next.js | 14 (App Router) | First-class | `examples/nextjs/` | Recommended path. Uses `snapfeed/server/nextjs`. |
 | Next.js | Pages Router | Works | — | Pass `createFeedbackHandler` through an `api/` route; the handler returns a `Response` that you can adapt to the legacy `(req, res)` shape. |
-| Remix | 2+ | Works in principle | Planned for v0.5 | Use `snapfeed/server/express`-style handler in a Remix `action`. |
-| Vite + React | 5+ | Works | Planned for v0.5 | Client-only setup; pair with any Node backend for the handler. |
+| Remix | 2+ | Works in principle | Example pending | Use `snapfeed/server/express`-style handler in a Remix `action`. |
+| Vite + React | 5+ | Works | Example available | Client-only setup; pair with any Node backend for the handler. |
 | Express | 4+ | First-class | — | Use `snapfeed/server/express`. |
 | Fastify | — | Works | — | Wrap `createFeedbackHandler` in a Fastify route handler — community port welcome. |
 | Hono | — | Works | — | Hono runs on edge runtimes; use the same handler + edge-safe adapters. |

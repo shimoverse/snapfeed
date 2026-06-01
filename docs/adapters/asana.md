@@ -35,7 +35,7 @@ You also need the **workspace gid** that the project lives in. The fastest way t
 Asana isn't auto-detected — register it explicitly when you build your handler:
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { asanaAdapter } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

@@ -25,6 +25,12 @@ Not an end-customer feedback widget. If you want a public "tell us what you thin
 
 Same widget. Different backend topology. Pick based on what your IT will approve.
 
+**New here? Choose one path:**
+
+1. **Try it locally:** run the 60-second quickstart below; feedback lands in `feedback.jsonl`.
+2. **Wire your team:** add one server-side destination such as Slack, GitHub, Linear, JIRA, or webhook.
+3. **Ship it safely:** follow the [production checklist](./docs/PRODUCTION_CHECKLIST.md) before enabling the widget beyond local/staging.
+
 **Per-persona quickstart guides** (5 min → 1 hour, copy-paste runnable): see [docs/quickstart/](./docs/quickstart/index.md) for indie, startup, mid-size, corp, OSS-maintainer, and designer walkthroughs.
 
 ## 60-second quickstart (zero config)
@@ -62,14 +68,14 @@ Press **Ctrl+Shift+F** (Cmd+Shift+F on Mac). Feedback dumps to `./feedback.jsonl
 **Wire a real destination — one env var, then restart `npm run dev`:**
 
 ```bash
-echo 'SNAPFEED_SLACK_WEBHOOK=https://hooks.slack.com/...' >> .env.local
+echo 'SNAPFEED_SLACK_WEBHOOK=<your Slack webhook URL>' >> .env.local
 ```
 
 > Need a Slack webhook URL? https://api.slack.com/messaging/webhooks (5 steps).
 
 The auto-adapter detects `SNAPFEED_*` env vars and wires them. **Note**: only the `SNAPFEED_`-prefixed names are read; `SLACK_WEBHOOK` (without the prefix) is silently ignored.
 
-> **Stuck? Run `npx snapfeed doctor`.** It prints a green/yellow/red checklist of your setup — install version, framework, destinations wired, env-var typos (with did-you-mean suggestions), handler file presence, and an optional `--probe=<url>` to check your dev server's `/api/feedback` route is reachable. **Always your first-stop debug command.**
+> **Stuck? Run `npx snapfeed doctor`.** It prints a green/yellow/red checklist of your setup — install version, framework, destinations wired, env-var typos (with did-you-mean suggestions), handler file presence, and an optional `--probe=<url>` to check your dev server's `/api/feedback` route is reachable. Before shipping beyond local/staging, run `npx snapfeed doctor --prod` to also check for explicit `allowedOrigins` and `rateLimit` guardrails. **Always your first-stop debug command.**
 
 ## What it does (the customer journey)
 
@@ -89,14 +95,19 @@ The auto-adapter detects `SNAPFEED_*` env vars and wires them. **Note**: only th
 ## The three modes in detail
 
 ### 🚀 Cloud-relayed
-For indies, hackathon teams, small startups who want zero infra. Browser → widget → adapter (Slack webhook / GitHub API / Discord webhook) directly. No snapfeed-operated relay. One `npm install`, one env var, restart.
+For indies, hackathon teams, small startups who want zero infra. Browser → widget → your `/api/feedback` route → server-side adapter (Slack webhook / GitHub API / Discord webhook). No snapfeed-operated relay. One `npm install`, one env var, restart.
 
 ```ts
 // app/api/feedback/route.ts
 import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { autoAdapters } from 'snapfeed/adapters'
 
-export const POST = createFeedbackHandler({ adapters: autoAdapters() })
+export const POST = createFeedbackHandler({
+  adapters: autoAdapters(),
+  // Required before enabling the widget beyond local/staging:
+  allowedOrigins: ['https://staging.example.com'],
+  rateLimit: { max: 10, windowMs: 60_000 },
+})
 ```
 
 ### 🏢 Self-hosted
@@ -131,7 +142,7 @@ export const POST = createFeedbackHandler({
 ```
 
 ### 🔒 Air-gapped
-For corporates and regulated industries where every new outbound domain needs a security review. v0.5 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. **Image-digest pinning shipped in v0.6** (run `./docker/pin-digests.sh --apply`); signed tarball + SSO/SAML for the admin app are slated for **v0.7** (see [SECURITY.md](./SECURITY.md) §Coming in later releases).
+For corporates and regulated industries where every new outbound domain needs a security review. v0.6 ships a self-hostable Docker stack: `docker compose -f docker/docker-compose.yml up` runs the worker + MinIO + optional Ollama (`--profile llm`) entirely inside your infrastructure. Pair with `webhookAdapter` pointed at your internal bug tracker, `fileAuditLog` to record every dispatch, and `redactForLLM` before any in-tenant LLM call. See [docker/README.md](./docker/README.md) for the install guide and [SECURITY.md](./SECURITY.md) for the corporate review checklist. **Image-digest pinning shipped in v0.6** (run `./docker/pin-digests.sh --apply`); signed tarball + SSO/SAML for the admin app are slated for **v0.7** (see [SECURITY.md](./SECURITY.md) §Coming in later releases).
 
 ## Persona picker
 
@@ -252,7 +263,7 @@ Every smart feature degrades cleanly without an LLM key. The library works fully
 | Repro steps | Extracted from voice + journey | Raw journey trail shown |
 
 ```ts
-// Real shape (shipped v0.4, current as of v0.5.3)
+// Real shape (shipped v0.4, current as of v0.6.0)
 import { createProvider, applyLLM } from 'snapfeed/llm'
 
 const provider = createProvider({

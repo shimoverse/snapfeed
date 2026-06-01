@@ -195,8 +195,14 @@ describe('snapfeed init', () => {
     )
     expect(routeSource).toContain("import { resolveRoute } from 'snapfeed/routing'")
     expect(routeSource).toContain("import routing from '../../../snapfeed.config'")
-    // The handler must wire resolveRoute via onReceive.
+    // The handler must wire resolveRoute via onReceive and include active
+    // production guardrails (not merely commented examples).
     expect(routeSource).toMatch(/onReceive:[\s\S]*resolveRoute\(payload,\s*routing\)/)
+    expect(routeSource).toContain('const allowedOrigins =')
+    expect(routeSource).toContain("SNAPFEED_ALLOWED_ORIGINS must be set")
+    expect(routeSource).toMatch(/allowedOrigins,/)
+    expect(routeSource).toContain('const rateLimit =')
+    expect(routeSource).toMatch(/rateLimit,/)
 
     // ── "Next steps" output must include the literal `<FeedbackProvider` snippet ──
     expect(res.stdout).toContain('<FeedbackProvider')

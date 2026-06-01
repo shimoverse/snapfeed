@@ -107,7 +107,7 @@ Processor will assist Controller in responding to Data Subject Access Requests (
 
 Controller acknowledges that Personal Data submitted via feedback may be replicated across multiple Sub-processor destinations (e.g. Slack message, JIRA ticket, Postgres row). Processor will execute deletion across all destinations within **30 days** of a verified request.
 
-The snapfeed library's planned `deleteByUserId()` API (v0.5) will automate this. Until then, Processor maintains a manual deletion runbook.
+The snapfeed library includes `deleteByUserId()` for snapfeed-managed uploads/audit trails. Processor still maintains a manual deletion runbook for downstream systems such as Slack, JIRA, and email.
 
 ---
 

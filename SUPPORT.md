@@ -22,7 +22,7 @@ Most questions are answered in the docs. Check these before opening an issue:
 | "Will breaking change X happen in a patch?" | [VERSIONING.md](./VERSIONING.md) |
 | "How do I contribute?" | [CONTRIBUTING.md](./CONTRIBUTING.md) |
 
-Per-persona quickstarts will live at `docs/quickstart/` (planned for v0.5 alongside the docs site).
+Per-persona quickstarts live at `docs/quickstart/`.
 
 ---
 
