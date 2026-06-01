@@ -11,9 +11,9 @@ snapfeed is the feedback widget for the people *inside* your build — testers, 
 
 Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your own team to actually file bugs while they're testing — keep reading.
 
-![snapfeed widget — closed state with floating trigger button](./docs/screenshots/widget-closed.png)
+![snapfeed animated demo — hotkey opens feedback widget, reporter types one sentence, screenshot and context are attached, and the item is routed to the team](./docs/screenshots/snapfeed-demo.gif)
 
-> The floating trigger sits in the corner. Hotkey, click, or programmatic open — same form. (Above: the `examples/vite-react` demo. Capture script: [`scripts/capture-screenshots.mjs`](./scripts/capture-screenshots.mjs).)
+> In one minute: a tester spots an issue, opens snapfeed from the hotkey or floating trigger, types a sentence, and the server route turns it into structured feedback for Slack/JIRA/Linear/GitHub/webhooks — with screenshot and page context attached.
 
 ## Pick your mode
 
