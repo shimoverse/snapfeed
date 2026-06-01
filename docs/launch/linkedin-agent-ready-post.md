@@ -6,50 +6,67 @@ Attach this GIF to the post:
 docs/screenshots/snapfeed-demo.gif
 ```
 
-Post draft:
+## Recommended post
 
-> I built snapfeed because the next feedback loop is not just human → ticket → engineer.
+> I have been using a small feedback widget across my personal projects for a while.
 >
-> It is reviewer agent → structured feedback → coding agent → test → PR → deploy.
+> The pattern kept coming back: when you are dogfooding a product, the hardest part is not noticing the bug. It is turning that moment into something actionable.
 >
-> Most product feedback tools still assume someone will manually notice the issue, open a tracker, choose a project, write the repro, attach screenshots, add browser details, and route it to the right team.
+> Screenshot. URL. Browser details. Console errors. Build context. Who reported it. Which area of the product it belongs to. Where it should go next.
 >
-> That is already too much friction for humans.
+> Humans forget half of that. Agents need all of it.
 >
-> It is the wrong abstraction for agents.
+> So I cleaned it up, made a few updates, and open sourced it.
 >
-> snapfeed is a small open source React/Next.js widget for internal dogfooding. A PM, designer, QA tester, beta user, or review agent can open it from the app, describe what they found, and send feedback with screenshot, URL, viewport, console errors, reporter identity, and build context attached.
+> It is called snapfeed.
 >
-> From there it can route to Slack, JIRA, Linear, GitHub, Discord, Telegram, Supabase, Google Sheets, a custom webhook, or your own agent orchestrator.
+> snapfeed is a React/Next.js feedback layer for internal dogfooding. A human tester, designer, PM, QA agent, design-review agent, or any reviewer inside your workflow can flag an issue from the product itself. snapfeed captures the context and routes it to Slack, JIRA, Linear, GitHub, Discord, Telegram, Supabase, Google Sheets, a webhook, or your own agent orchestrator.
 >
-> The goal is simple: if a QA agent or design agent reviews a build and finds a problem, the feedback should already be structured enough for the coding agent to start the fix.
+> The bigger idea is not “file a better ticket.”
 >
-> snapfeed does not try to be the orchestrator. Hermes, OpenClaw, Codex, Claude Code, OpenCode, GitHub Actions, Temporal, or your own system can own the actual agent run, approvals, tests, and deployment.
+> The bigger idea is: bug spotted → feedback sent → coding agent gets context → fix tested → deployed.
 >
-> snapfeed is the handoff layer.
->
-> It gives the agent stack the thing it usually lacks: high-context product feedback from inside the actual UI.
->
-> Humans can use it too. That is the point. Same flow, same payload, same audit trail.
->
-> It is built for internal teams dogfooding software with humans and agents side by side.
->
-> Repo: https://github.com/shimoverse/snapfeed
->
-> If you are building agent review loops, QA agents, PM agents, or design agents, I would love feedback, forks, adapters, and orchestration examples.
-
-Shorter variant:
-
-> I built snapfeed as the feedback layer for agentic software teams.
->
-> A human tester, PM agent, QA agent, or design-review agent can flag an issue from inside the product. snapfeed captures the screenshot, URL, viewport, console errors, reporter identity, and build context, then routes it to Slack/JIRA/Linear/GitHub/webhook or an agent orchestrator.
->
-> The idea: feedback should be structured enough for the coding agent to start the fix.
->
-> snapfeed is not the orchestrator. Hermes, OpenClaw, Codex, Claude Code, OpenCode, GitHub Actions, Temporal, or your own queue can own approvals, tests, PRs, and deploys.
+> snapfeed is not trying to be the orchestrator. Tools like Hermes, OpenClaw, Codex, Claude Code, OpenCode, GitHub Actions, Temporal, or your own queue can own the agent run, approvals, tests, PRs, and deployment.
 >
 > snapfeed is the handoff layer between product review and product repair.
 >
-> Open source: https://github.com/shimoverse/snapfeed
+> I built it from a product-builder point of view: reduce friction at the exact moment someone notices the issue, preserve the context, and make the next step obvious for either a human teammate or an agent.
+>
+> It is web-friendly, mobile-web friendly, self-hostable, and open source. You can inspect the code, fork it, open PRs, add adapters, or shape it for your own agent workflow.
+>
+> Personal open-source project, built outside my day job.
+>
+> Repo: https://github.com/shimoverse/snapfeed
+>
+> If you are building QA agents, PM agents, design-review agents, or product repair loops, I would love feedback.
+
+## Shorter variant
+
+> I open sourced a small tool I have been using across my personal projects.
+>
+> It is called snapfeed: a React/Next.js feedback layer for internal dogfooding.
+>
+> A human tester, designer, PM, QA agent, or design-review agent can flag an issue from inside the product. snapfeed captures screenshot, URL, viewport, console errors, reporter identity, and build context, then routes it to Slack/JIRA/Linear/GitHub/webhook or an agent orchestrator.
+>
+> The goal is not just a better ticket.
+>
+> It is: bug spotted → feedback sent → coding agent gets context → fix tested → deployed.
+>
+> snapfeed does not replace your orchestrator. Hermes, OpenClaw, Codex, Claude Code, OpenCode, GitHub Actions, Temporal, or your own queue can own approvals, tests, PRs, and deploys.
+>
+> snapfeed is the handoff layer between product review and product repair.
+>
+> Web-friendly, mobile-web friendly, self-hostable, and open source.
+>
+> Personal project, built outside my day job.
+>
+> Repo: https://github.com/shimoverse/snapfeed
 >
 > Would love feedback, forks, adapters, and examples from anyone building agent review/fix loops.
+
+## Posting notes
+
+- Use the GIF as the media attachment.
+- Lead with the personal builder story, not the feature list.
+- Keep the “outside my day job” line near the end so it is clear but not defensive.
+- Avoid overclaiming auto-fix. The accurate claim is that snapfeed gives the orchestrator enough context to start the fix workflow.
