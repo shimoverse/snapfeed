@@ -1,8 +1,8 @@
 # snapfeed reference manual
 
-> The canonical reference for snapfeed v0.5. Beyond the [quickstart guides](./quickstart/index.md), this document is "how to do anything in snapfeed." Long form, structured so you can jump to a section.
+> The canonical reference for snapfeed v0.6. Beyond the [quickstart guides](./quickstart/index.md), this document is "how to do anything in snapfeed." Long form, structured so you can jump to a section.
 
-Last updated: 2026-04-26 (snapfeed v0.5.3)
+Last updated: 2026-06-01 (snapfeed v0.6.0)
 
 ---
 
@@ -158,10 +158,10 @@ export default function RootLayout({ children }) {
 Pass `createFeedbackHandler` through an `api/` route. The handler returns a `Response`; adapt to the `(req, res)` shape if your codebase requires it.
 
 #### Remix — works in principle
-Use the `snapfeed/server/express`-style handler in a Remix `action`. First-class example planned for v0.5.
+Use the `snapfeed/server/express`-style handler in a Remix `action`. See the framework examples under `examples/` for the current reference shape.
 
 #### Vite + React — works
-Client-only setup; pair with any Node backend for the handler. First-class example planned for v0.5.
+Client-only setup; pair with any Node backend for the handler. See the framework examples under `examples/` for the current reference shape.
 
 #### Express — first-class
 Use `snapfeed/server/express`'s `feedbackMiddleware`.
@@ -254,7 +254,7 @@ return (
 
 ### 3.7 Build context
 
-`buildId`, `gitSha`, and `env` are not yet first-class top-level props (planned for v0.5). Until then, attach via the `user` field or your own metadata layer:
+`buildId`, `gitSha`, and `env` are not first-class top-level props yet. Attach them through `metadata.custom` in your handler or your own metadata layer:
 
 ```tsx
 <FeedbackProvider
@@ -880,7 +880,7 @@ See [`docker/README.md`](../docker/README.md). Five-step quickstart: clone, copy
 
 ### 10.3 Air-gapped
 
-Same Docker stack with no outbound egress. Use `webhookAdapter` pointed at internal trackers; `provider: 'ollama'` for in-tenant LLM. Pin image digests yourself (v0.4 uses named tags; pinning ships in v0.5). Mirror images to your internal registry.
+Same Docker stack with no outbound egress. Use `webhookAdapter` pointed at internal trackers; `provider: 'ollama'` for in-tenant LLM. Pin image digests with `docker/pin-digests.sh --apply` before promoting an image to regulated environments. Mirror images to your internal registry.
 
 ### 10.4 Kubernetes manifest skeleton
 
@@ -915,7 +915,7 @@ spec:
 
 ### 10.5 Reverse-proxy SSO pattern
 
-Until the admin app ships SSO/SAML in v0.5, put the read-only admin example behind an existing SSO reverse proxy (`oauth2-proxy`, `Pomerium`, your corp's HTTP front door). The widget's `apiUrl` does not need SSO — it uses the consumer's existing same-origin auth.
+Until the admin app ships built-in SSO/SAML, put the read-only admin example behind an existing SSO reverse proxy (`oauth2-proxy`, `Pomerium`, your corp's HTTP front door). The widget's `apiUrl` does not need SSO — it uses the consumer's existing same-origin auth.
 
 ---
 
@@ -1076,7 +1076,7 @@ You *can*, but it's the wrong tool. snapfeed is shaped for signed-in internal te
 Implement the `FeedbackAdapter` interface (one method, `send(payload) → result`). See `src/adapters/slack.ts` for a 50-line reference. PRs welcome — see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ### How do I bring my own LLM?
-`provider: 'custom'` is reserved. Until it's wired in v0.5, the supported path is `provider: 'openai'` with `endpoint` pointed at an OpenAI-compatible proxy (vLLM, LiteLLM, OpenRouter, etc.).
+`provider: 'custom'` is reserved. Until it's wired, the supported path is `provider: 'openai'` with `endpoint` pointed at an OpenAI-compatible proxy (vLLM, LiteLLM, OpenRouter, etc.).
 
 ### Does it work without React?
 The widget is React-only today. The adapter runtime (`createFeedbackHandler`, all adapters) is framework-agnostic — you can POST any valid `FeedbackPayload` to the handler from any client.
@@ -1088,13 +1088,13 @@ The provider is a Client Component (`'use client'` at the top of `FeedbackProvid
 Pass a custom `RateLimitStore` keyed on `user.email` instead of the IP. The default keyer uses IP from `x-forwarded-for`.
 
 ### How do I delete a user's submitted feedback (GDPR right to erasure)?
-Today: manually, against each adapter destination (delete the JIRA tickets, the Slack messages, the Postgres rows). `deleteByUserId()` ships in v0.5.
+For snapfeed-managed uploads/audit trails, use `deleteByUserId()`. For downstream destinations, delete directly in each system (JIRA tickets, Slack messages, Postgres rows, etc.).
 
 ### Does snapfeed work behind a corporate proxy?
 Yes — adapters use `fetch`, which honors `HTTP_PROXY` / `HTTPS_PROXY` env vars in Node 20+. For non-fetch HTTP libraries inside an adapter, configure the proxy at the runtime level.
 
 ### Is snapfeed accessible (WCAG)?
-The widget targets WCAG 2.1 AA. Full external audit + remediation is on the v0.5 roadmap. See [`COMPLIANCE.md`](../COMPLIANCE.md) for the current state.
+The widget targets WCAG 2.1 AA. Full external audit + remediation remains on the roadmap. See [`COMPLIANCE.md`](../COMPLIANCE.md) for the current state.
 
 ### How do I localize the widget UI?
 i18n is not yet first-class. The string set is small and lives inside the React components — a fork can swap them. First-class i18n is a v0.6+ candidate.
@@ -1299,4 +1299,4 @@ All of the adapters above plus their per-adapter option types (e.g. `SlackAdapte
 
 ---
 
-> Document version: v0.5.3 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed.
+> Document version: v0.6.0 / 2026-06-01. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed.

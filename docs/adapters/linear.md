@@ -51,7 +51,7 @@ If you also want to scope to a project, label, workflow state, or assignee, grab
 
 ```ts
 // app/api/feedback/route.ts (Next.js App Router) — or wherever your handler lives
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { linearAdapter } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

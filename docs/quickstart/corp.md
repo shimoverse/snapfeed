@@ -3,7 +3,7 @@
 **Persona:** Engineering, QA, or IT lead at a Fortune 500 or regulated industry (finance, healthcare, defense, gov). Strict security review. Data must not leave the VPC. Identity provider is Okta or Azure AD. Any LLM must be in-tenant (AWS Bedrock or Azure OpenAI in your subscription) — no third-party AI APIs.
 **Goal:** Air-gapped Docker install, in-tenant LLM, audit log shipped to your SIEM, JIRA + ServiceNow destinations, full security review checklist green.
 **Time budget:** 1–2 weeks total. Less than a day of actual install work; the rest is your security review cycle.
-**snapfeed version:** v0.5.x
+**snapfeed version:** v0.6.0
 
 This guide is sequenced as a **security-review-friendly path**, not "install first, ask forgiveness later." Steps 1–2 happen before any code lands in your network.
 
@@ -46,7 +46,7 @@ Before touching your internal Git mirror, hand your security team this set of fi
 git clone https://github.com/shimoverse/snapfeed.git snapfeed-mirror
 cd snapfeed-mirror
 git fetch --tags
-git checkout v0.5.3
+git checkout v0.6.0
 git tag review-approved-2026-q2
 git push --tags origin
 ```
@@ -58,7 +58,7 @@ From now on, your CI builds from `review-approved-2026-q2`, not from `main`. Re-
 ```bash
 docker build \
   --no-cache \
-  -t internal-registry.acmecorp.local/snapfeed:0.5.3 \
+  -t internal-registry.acmecorp.local/snapfeed:0.6.0 \
   -f docker/Dockerfile \
   .
 ```
@@ -68,7 +68,7 @@ For full reproducibility, also pin the base image by digest. Edit `docker/Docker
 ## 4. Push to your internal registry
 
 ```bash
-docker push internal-registry.acmecorp.local/snapfeed:0.5.3
+docker push internal-registry.acmecorp.local/snapfeed:0.6.0
 ```
 
 Mirror the upstream MinIO and (optionally) Ollama images the same way. The exact image references in `docker/docker-compose.yml`:
@@ -131,7 +131,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: internal-registry.acmecorp.local/snapfeed:0.5.3
+          image: internal-registry.acmecorp.local/snapfeed:0.6.0
           ports:
             - containerPort: 8787
           envFrom:
@@ -309,7 +309,7 @@ Vector, Filebeat, or your in-house log shipper work the same way — they tail t
 
 ## 10. SSO / SAML for the admin viewer — read-only behind your auth proxy
 
-SSO/SAML for the admin viewer is **planned for v0.5**, not shipped. The admin app at `examples/admin/` is read-only and stateless — sit it behind your existing auth proxy (oauth2-proxy, Pomerium, your ingress's OIDC plugin):
+SSO/SAML for the admin viewer is **not built in yet**. The admin app at `examples/admin/` is read-only and stateless — sit it behind your existing auth proxy (oauth2-proxy, Pomerium, your ingress's OIDC plugin):
 
 ```nginx
 # nginx — example reverse proxy with oauth2-proxy in front
@@ -324,7 +324,7 @@ location /snapfeed-admin/ {
 }
 ```
 
-Until v0.5 ships SAML/OIDC inside the admin app, this proxy pattern is the supported path.
+Until SAML/OIDC is built into the admin app, this proxy pattern is the supported path.
 
 ## Verify it works
 
@@ -379,9 +379,9 @@ This matrix maps each row in `SECURITY.md`'s review checklist to the file or com
 | No `eval`, `Function()`, dynamic remote imports | ✅ shipped | grep `src/` — only `await import('next/server')` (static peer dep), no remote URL imports |
 | Audit log primitive | ✅ shipped | `src/audit-log.ts` — `fileAuditLog`, `noopAuditLog`, `multiAuditLog`; events: `feedback.received`, `adapter.dispatched`, `llm.called`, `config.changed`, `rate_limit.hit` |
 | Self-hostable Docker stack | ✅ shipped | `docker/docker-compose.yml`, `docker/README.md` |
-| SBOM published per release | planned v0.5 | Run `npm sbom --sbom-format cyclonedx > snapfeed-sbom.json` against `node_modules/` of the pinned tag for now |
+| SBOM published per release | planned | Run `npm sbom --sbom-format cyclonedx > snapfeed-sbom.json` against `node_modules/` of the pinned tag for now |
 | Reproducible builds (image digests) | partial | `package-lock.json` pinned ✅; image digests in compose file = TODO. Pin `node:20-alpine@sha256:...` in `docker/Dockerfile` yourself. |
-| Retention / GDPR right-to-erasure | planned v0.5 | No `retentionDays` config or `deleteByUserId()` API in v0.4. If your jurisdiction requires erasure, write a cron against the audit log JSONL until the API ships. |
-| SSO/SAML for admin | planned v0.5 | Front the admin viewer with oauth2-proxy / Pomerium (step 10). |
+| Retention / GDPR right-to-erasure | ✅ shipped helper APIs | Use `deleteByUserId()` plus `pruneOlderThan({ retentionDays })` for snapfeed-managed audit/storage artifacts; still run destination-native deletion for Slack/JIRA/Linear/etc. |
+| SSO/SAML for admin | planned | Front the admin viewer with oauth2-proxy / Pomerium (step 10). |
 
 Hand this matrix, plus the file list from step 1, to your reviewer. The "Evidence" column points at exactly the source they need to read.

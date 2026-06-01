@@ -2,7 +2,7 @@
 
 > **Mermaid diagrams render natively on GitHub.** To render locally, use [Mermaid Live](https://mermaid.live) or your editor's plugin (e.g. Markdown Preview Mermaid Support for VS Code).
 >
-> **All `file:line` references are valid as of v0.5.3** and may drift in newer versions. When in doubt, jump to the symbol in `src/`.
+> **All `file:line` references are valid as of v0.6.0** and may drift in newer versions. When in doubt, jump to the symbol in `src/`.
 
 This document is for two audiences:
 
@@ -912,7 +912,7 @@ The public API surface is everything reachable from these subpath exports:
 
 ```mermaid
 mindmap
-  root((snapfeed v0.5.3))
+  root((snapfeed v0.6.0))
     snapfeed
       FeedbackProvider
       FeedbackWidget

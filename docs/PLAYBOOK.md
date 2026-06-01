@@ -1,8 +1,8 @@
 # snapfeed adoption playbook
 
-> **Adoption playbook for snapfeed v0.5. Use this as a template — copy what fits, drop what doesn't.** Written for an engineering manager who has decided to try snapfeed and needs to (a) convince their team it's worth the airtime, (b) roll it out without breaking anything, and (c) know within 30 days whether it's working.
+> **Adoption playbook for snapfeed v0.6. Use this as a template — copy what fits, drop what doesn't.** Written for an engineering manager who has decided to try snapfeed and needs to (a) convince their team it's worth the airtime, (b) roll it out without breaking anything, and (c) know within 30 days whether it's working.
 
-Last updated: 2026-04-26 (snapfeed v0.5.3)
+Last updated: 2026-06-01 (snapfeed v0.6.0)
 
 ---
 
@@ -166,7 +166,7 @@ Use the **Phase 3 launch post** from the templates appendix. Include the dashboa
 | "What if it breaks?" | `enableInProduction: false` is the default — the widget is a no-op in production unless you opt in. Phase 1 is staging-only. The handler has rate limits, payload caps, and origin allowlist by default. Worst case in Phase 1 is "the widget doesn't open." |
 | "Who's going to triage?" | The feedback steward role. One named person, ten minutes per day in Phase 1. See the triage runbook in the templates appendix. |
 | "What about leaks (secrets in feedback)?" | Three layers: `sanitizeConsoleError` strips token / key / secret / Authorization / JWT shapes from console errors before any adapter sees the payload; `redactForLLM` strips emails / CC-shape digits / JWTs / high-entropy tokens before LLM calls; reporter education ("don't paste API keys into the textbox") in your onboarding. The widget shows a screenshot preview before send so the reporter can discard. |
-| "Does it work with our SSO?" | The widget itself doesn't have its own auth — it uses the consumer's session. The admin viewer ships SSO/SAML in v0.5; until then, put it behind your existing reverse-proxy SSO. |
+| "Does it work with our SSO?" | The widget itself doesn't have its own auth — it uses the consumer's session. The admin viewer does not yet ship built-in SSO/SAML; put it behind your existing reverse-proxy SSO. |
 | "Can we keep the data in [region]?" | Yes. The worker runs wherever you put it. The destinations you wire control storage residency. See the residency table in [`COMPLIANCE.md`](../COMPLIANCE.md). |
 
 ---
@@ -311,4 +311,4 @@ snapfeed is uninstallable. Remove the `<FeedbackProvider>` from your app, remove
 
 ---
 
-> Document version: v0.5.3 / 2026-04-26. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed in this release.
+> Document version: v0.6.0 / 2026-06-01. See [`CHANGELOG.md`](../CHANGELOG.md) for what changed in this release.

@@ -73,7 +73,7 @@ Explicit form (Sheets is not auto-wired by `autoAdapters()`):
 
 ```ts
 import { googleSheetsAdapter } from 'snapfeed/adapters'
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 
 export default createFeedbackHandler({
   adapters: [

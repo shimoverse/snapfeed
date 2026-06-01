@@ -3,7 +3,7 @@
 **Persona:** Maintainer of an open-source project. You run a docs site or a playground app, and you want feedback from users to land directly in your repo as GitHub Issues. You also want to make it easy for your community to contribute adapters back.
 **Goal:** Snapfeed widget on your docs site, feedback creates GitHub Issues with the right labels, gated to maintainers (or open to all readers, your call). Plus a clear path for forking and accepting community PRs.
 **Time budget:** 15 minutes for the install. Forking is an afternoon.
-**snapfeed version:** v0.5.x
+**snapfeed version:** v0.6.0
 
 ---
 

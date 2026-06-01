@@ -38,7 +38,7 @@ Creating the integration is not enough — Notion's API will return `404 object_
 Notion is not auto-detected, so you wire it explicitly in your handler:
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { notionAdapter } from 'snapfeed/adapters'
 
 export default createFeedbackHandler({

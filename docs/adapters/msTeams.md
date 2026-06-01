@@ -40,7 +40,7 @@ MS_TEAMS_WEBHOOK=https://<tenant>.webhook.office.com/webhookb2/...
 ```
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { msTeamsAdapter } from 'snapfeed/adapters'
 
 createFeedbackHandler({

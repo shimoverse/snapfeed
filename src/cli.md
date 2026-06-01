@@ -41,7 +41,7 @@ The CLI:
 | ----------------------------------- | ------------ | ----------------------------------------------------- |
 | `snapfeed.config.ts`                | always       | Skeleton with `defineRouting({ routes, default })`.   |
 | `.env.example`                      | always       | Created if missing; otherwise a marked block is appended. Existing `.env` and `.env.local` are never touched. |
-| `app/api/feedback/route.ts`         | Next.js only | Stub that calls `createFeedbackHandler({ adapters: autoAdapters() })`. |
+| `app/api/feedback/route.ts`         | Next.js only | Stub that calls `createFeedbackHandler({ adapters: autoAdapters(), allowedOrigins, rateLimit })`. |
 
 If a target file already exists, the CLI prompts:
 
@@ -116,6 +116,22 @@ runtime `autoAdapters()` reads. The CLI stubs them into `.env.example`:
 | `discord`   | `SNAPFEED_DISCORD_WEBHOOK`                                                            |
 | `telegram`  | `SNAPFEED_TELEGRAM_BOT_TOKEN`, `SNAPFEED_TELEGRAM_CHAT_ID`                            |
 | `webhook`   | `SNAPFEED_WEBHOOK_URL`                                                                |
+
+## Production doctor
+
+After `init`, run the normal health check locally:
+
+```bash
+npx snapfeed doctor
+```
+
+Before enabling snapfeed beyond local/staging, run the stricter production check:
+
+```bash
+npx snapfeed doctor --prod
+```
+
+`--prod` keeps the normal install/framework/env/handler checks and adds static verification that the detected Next.js handler has explicit `allowedOrigins` and `rateLimit` guardrails.
 
 ## Troubleshooting
 

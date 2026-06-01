@@ -12,7 +12,7 @@
 `autoAdapters()` is the zero-config path. You install snapfeed, you set env vars, you wrap your handler once, you're done — no per-adapter imports, no per-adapter wiring code:
 
 ```ts
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { autoAdapters } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

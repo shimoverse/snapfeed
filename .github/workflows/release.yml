@@ -69,18 +69,22 @@ jobs:
         continue-on-error: true
 
       - name: Pack (verify tarball shape)
+        id: pack
         run: |
-          npm pack --dry-run
-          # Sanity: the tarball must include README, LICENSE, and dist/.
-          npm pack --dry-run 2>&1 | grep -q 'README.md'
-          npm pack --dry-run 2>&1 | grep -q 'LICENSE'
-          npm pack --dry-run 2>&1 | grep -q 'dist/index.cjs'
+          TARBALL=$(npm pack --json | node -e "let s=''; process.stdin.on('data', d => s += d); process.stdin.on('end', () => { const data = JSON.parse(s); console.log(data[0].filename); })")
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "Created $TARBALL"
+          # Sanity: the release tarball must include README, LICENSE, dist/, and production docs.
+          tar -tzf "$TARBALL" | grep -q 'package/README.md'
+          tar -tzf "$TARBALL" | grep -q 'package/LICENSE'
+          tar -tzf "$TARBALL" | grep -q 'package/dist/index.cjs'
+          tar -tzf "$TARBALL" | grep -q 'package/docs/PRODUCTION_CHECKLIST.md'
 
       - name: Publish to npm
         # `--provenance` requires `id-token: write` in the workflow permissions.
         # `--access public` is required the first time a scoped/unscoped pkg is
         # published; harmless to repeat.
-        run: npm publish --provenance --access public
+        run: npm publish "${{ steps.pack.outputs.tarball }}" --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -119,6 +123,6 @@ jobs:
           # Attach the .tgz so consumers can audit the exact bytes that were
           # published (matches what `npm pack` produces locally).
           files: |
-            snapfeed-*.tgz
+            ${{ steps.pack.outputs.tarball }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

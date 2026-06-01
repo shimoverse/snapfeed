@@ -2,7 +2,7 @@
 
 > **Honest read of where snapfeed sits relative to common regulatory regimes.** snapfeed is a self-hosted MIT library, not a service. The maintainers operate no infrastructure and process no end-user data. As a result, almost every regulatory obligation falls on the **consumer** (the organization that embeds and operates the library). This document maps each regime to what snapfeed provides versus what the consumer must implement.
 
-Last updated: 2026-04-26 (snapfeed v0.5.3)
+Last updated: 2026-06-01 (snapfeed v0.6.0)
 
 ---
 
@@ -17,7 +17,7 @@ Last updated: 2026-04-26 (snapfeed v0.5.3)
 | PCI DSS | No | Yes if PAN never enters snapfeed (recommended) |
 | ISO 27001 / 27017 / 27018 | No | Inherited from consumer's ISMS |
 | FedRAMP | No (no ATO) | Yes if deployed inside an existing ATO boundary |
-| Section 508 / WCAG 2.1 AA | Targets AA; full audit in v0.5 | Partial — see accessibility section |
+| Section 508 / WCAG 2.1 AA | Targets AA; full external audit still pending | Partial — see accessibility section |
 
 ---
 
@@ -33,7 +33,7 @@ snapfeed is a **library**, not a controller or a processor under Article 4. The 
 | International data transfer | Determined entirely by where the consumer deploys and where their adapter destinations store data; snapfeed itself transfers nothing |
 | DPA | Consumer signs a DPA with each adapter destination provider; a starter template is at `legal/DPA-template.md` |
 | Right of access (Art. 15) | Consumer must implement against their adapter destinations |
-| Right to erasure (Art. 17) | Consumer must implement; `retentionDays` + `deleteByUserId()` is on the v0.5 roadmap |
+| Right to erasure (Art. 17) | Consumer must implement against their stores; snapfeed provides `deleteByUserId()` plus `pruneOlderThan({ retentionDays })` helpers for its own audit/storage primitives |
 | Right to rectification (Art. 16) | Consumer must implement against their stored data |
 | Records of processing (Art. 30) | Consumer maintains; the audit log (`src/audit-log.ts`) provides the per-event record of what was dispatched where |
 | Data Protection Officer | Consumer's responsibility |
@@ -45,7 +45,7 @@ snapfeed is a **library**, not a controller or a processor under Article 4. The 
 2. Sign a DPA with every destination provider you wire up (Slack, Atlassian, Linear, etc.). Adapt `legal/DPA-template.md` for your customers if you in turn act as a processor.
 3. Enable `redactBeforeLLM` if any GenAI provider sits outside the EEA, or use `provider: 'ollama'` in-tenant.
 4. Wire `fileAuditLog` (or your own implementation) so you can demonstrate Article 30 compliance.
-5. Document a manual deletion runbook against each destination until v0.5 ships `deleteByUserId()`.
+5. Document a deletion runbook against each destination; use snapfeed `deleteByUserId()` for snapfeed-managed audit/storage artifacts and provider-native deletion APIs for downstream systems.
 
 ---
 
@@ -130,7 +130,7 @@ snapfeed has **no FedRAMP authorization**. The library can be deployed inside a 
 
 For deployment in a FedRAMP boundary:
 
-- Use the self-hosted Docker stack and pin image digests (consumer-side until v0.5 ships pinned digests).
+- Use the self-hosted Docker stack and pin image digests in your deployment pipeline.
 - Use only adapter destinations that are themselves FedRAMP-authorized at the appropriate impact level.
 - Use `provider: 'ollama'` for any LLM features; do not call third-party LLM APIs.
 - Wire the audit log to the boundary's existing SIEM.
@@ -139,9 +139,9 @@ For deployment in a FedRAMP boundary:
 
 ## Section 508 / WCAG 2.1 AA accessibility
 
-Current widget targets **WCAG 2.1 AA**. A full audit + remediation is tracked for **v0.5**.
+Current widget targets **WCAG 2.1 AA**. A full external audit + remediation pass remains a roadmap item.
 
-| Item | Status in v0.4 |
+| Item | Status in v0.6 |
 |---|---|
 | Keyboard navigation | Hotkey activation; trigger button is a real `<button>`; tab order through form fields |
 | Focus management | Focus moves to the widget on open; focus trap inside the dialog; focus returns to trigger on close |
@@ -152,7 +152,7 @@ Current widget targets **WCAG 2.1 AA**. A full audit + remediation is tracked fo
 | Touch target size | All interactive elements ≥44×44 CSS px on mobile |
 | Captions for voice | Voice clips are not auto-captioned; consumers must add transcription if accessibility-required |
 
-Known gaps tracked for v0.5:
+Known gaps:
 
 - Full audit by an external WCAG-certified reviewer.
 - ARIA-live announcements for async state changes.

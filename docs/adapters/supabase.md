@@ -61,7 +61,7 @@ Unlike `slackAdapter`, this one isn't picked up by `autoAdapters()` — wire it 
 
 ```ts
 // app/api/feedback/route.ts (or pages/api/feedback.ts)
-import { createFeedbackHandler } from 'snapfeed/server'
+import { createFeedbackHandler } from 'snapfeed/server/nextjs'
 import { supabaseAdapter } from 'snapfeed/adapters'
 
 export const POST = createFeedbackHandler({

@@ -2,7 +2,7 @@
 
 > **Project-level privacy posture for the snapfeed open-source library.** This is *not* the privacy policy for any application that embeds snapfeed — that policy belongs to the consumer. See ["What to write in your own app's privacy policy"](#what-to-write-in-your-own-apps-privacy-policy) at the bottom for a copy-paste paragraph you can adapt.
 
-Last updated: 2026-04-26 (snapfeed v0.5.3)
+Last updated: 2026-06-01 (snapfeed v0.6.0)
 
 ---
 
@@ -131,7 +131,7 @@ The only outbound network calls the runtime ever makes are:
 2. Calls each configured adapter makes to the destination the consumer wired.
 3. Optional LLM calls to the provider the consumer configured, with the consumer's key.
 
-You can verify this end-to-end by reading the source — `npm sbom` (planned v0.5) will produce the dependency manifest.
+You can verify this end-to-end by reading the source — `npm sbom` can produce the dependency manifest.
 
 ---
 
@@ -171,7 +171,7 @@ snapfeed itself stores **nothing** centrally. Retention policy lives in whicheve
 - Supabase / S3 / file: governed by the consumer's storage configuration.
 - File / JSONL: nothing is rotated automatically — the consumer must run their own log rotation.
 
-A `retentionDays` config + `deleteByUserId()` API for GDPR right-to-erasure is on the v0.5 roadmap (see `SECURITY.md`).
+Retention pruning helpers and `deleteByUserId()` are available; see `docs/gdpr.md` and `SECURITY.md` for the deployment runbook.
 
 ---
 

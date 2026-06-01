@@ -3,7 +3,7 @@
 **Persona:** Solo dev, hackathon team, side project, OSS maintainer running a staging deploy.
 **Goal:** Press a hotkey in your app, write a sentence, see it land in a Slack channel you already own.
 **Time budget:** 5 minutes.
-**snapfeed version:** v0.5.x
+**snapfeed version:** v0.6.0
 
 This is the simplest possible setup: one Slack incoming webhook, one env var, one provider wrapper. No database, no admin UI, no Docker.
 
