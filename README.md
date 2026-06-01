@@ -13,9 +13,9 @@ Use it as the intake pipe for an agentic product loop: review agent finds the is
 
 Not an end-customer feedback widget. If you want a public "tell us what you think" form, use Canny. If you want your team and agents to file high-context bugs while they test — keep reading.
 
-![snapfeed animated demo — hotkey opens feedback widget, reporter types one sentence, screenshot and context are attached, and the item is routed to the team](./docs/screenshots/snapfeed-demo.gif)
+![snapfeed animated demo — bug spotted, feedback sent, coding agent fixes, tests pass, and the change is deployed](./docs/screenshots/snapfeed-demo.gif)
 
-> In one minute: a human or agent reviewer spots an issue, opens snapfeed from the hotkey or floating trigger, adds a sentence, and the server route sends structured feedback to Slack/JIRA/Linear/GitHub/webhooks or your agent orchestrator.
+> The story is bigger than filing a ticket: a human or agent reviewer spots an issue, snapfeed captures the context, your orchestrator routes it to the right coding agent, and the fix can move through test, PR, and deployment.
 
 ## Pick your mode
 
