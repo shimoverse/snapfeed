@@ -608,6 +608,7 @@ export function FeedbackWidget() {
       {/* Backdrop */}
       <div
         className="__dtfb_overlay"
+        data-snapfeed-ui="true"
         onClick={e => {
           // Don't let a stray backdrop click dismiss the modal mid-submit —
           // losing the in-flight state would confuse the user.

@@ -69,7 +69,36 @@ describe('supabaseAdapter', () => {
     expect(result.deliveryId).toBe('row_42')
   })
 
-  it('throws when caller tries to mutate frozen headers (defensive immutability)', async () => {
+  it('stores target context inside metadata for agent/orchestrator consumers', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify([{ id: 'row_target' }]), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+
+    const adapter = supabaseAdapter({
+      url: 'https://x.supabase.co',
+      anonKey: 'anon',
+    })
+    await adapter.send({
+      ...basePayload,
+      target: {
+        tagName: 'button',
+        selector: '[data-testid="pay-now"]',
+        domPath: 'body > main > button.primary',
+        componentName: 'CheckoutButton',
+      },
+    })
+
+    const row = JSON.parse(fetchMock.mock.calls[0]![1].body)
+    expect(row.metadata.target).toMatchObject({
+      selector: '[data-testid="pay-now"]',
+      componentName: 'CheckoutButton',
+    })
+  })
+
+  it('keeps fetch headers frozen for defensive immutability', async () => {
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify([{ id: 'row_1' }]), {
         status: 201,
@@ -83,9 +112,6 @@ describe('supabaseAdapter', () => {
     })
     await adapter.send(basePayload)
 
-    // The headers object passed to fetch is the same reference the adapter
-    // holds. Object.freeze() means any caller-side attempt to delete the
-    // apikey/Authorization header will throw in strict mode (vitest is strict).
     const init = fetchMock.mock.calls[0]![1]
     expect(Object.isFrozen(init.headers)).toBe(true)
   })

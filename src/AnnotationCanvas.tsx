@@ -304,6 +304,7 @@ export function AnnotationCanvas({
   return (
     /* Full-screen overlay */
     <div
+      data-snapfeed-ui="true"
       style={{
         position: 'fixed',
         inset: 0,

@@ -131,12 +131,13 @@ export function validatePayload(
     return { valid: false, error: 'Feedback text is too long (max 64,000 bytes)' }
   }
 
-  // Payload size check (text + metadata, not screenshot)
+  // Payload size check (text + metadata + target context, not screenshot)
   const maxPayload = config.maxPayloadBytes ?? 10_000
   const textSize = utf8ByteLength(payload.text as string)
   const metaSize = payload.metadata ? utf8ByteLength(JSON.stringify(payload.metadata)) : 0
+  const targetSize = payload.target ? utf8ByteLength(JSON.stringify(payload.target)) : 0
 
-  if (textSize + metaSize > maxPayload) {
+  if (textSize + metaSize + targetSize > maxPayload) {
     return {
       valid: false,
       error: `Payload too large (max ${Math.round(maxPayload / 1000)}KB)`,
@@ -205,6 +206,7 @@ export function normalizePayload(body: unknown): FeedbackPayload {
     category: raw.category,
     user: raw.user,
     metadata: raw.metadata,
+    target: raw.target,
     screenshot: raw.screenshot,
   }
 }

@@ -13,6 +13,7 @@ import {
   validatePayload,
   checkOrigin,
   defaultRateLimitStore,
+  normalizePayload,
 } from '../../src/server/security'
 import type { FeedbackHandlerConfig } from '../../src/types'
 
@@ -85,6 +86,42 @@ describe('validatePayload', () => {
     )
     expect(result.valid).toBe(false)
     expect(result.error).toMatch(/payload too large/i)
+  })
+
+  it('counts target element context toward maxPayloadBytes', () => {
+    const result = validatePayload(
+      {
+        text: 'hello',
+        target: {
+          tagName: 'button',
+          selector: '[data-testid="pay-now"]',
+          domPath: 'body > main > button',
+          text: 'x'.repeat(20_000),
+        },
+      },
+      { adapters: [], maxPayloadBytes: 10_000 }
+    )
+    expect(result.valid).toBe(false)
+    expect(result.error).toMatch(/payload too large/i)
+  })
+
+  it('preserves target context during normalization for server-side adapters', () => {
+    const payload = normalizePayload({
+      text: 'Button copy feels risky',
+      appName: 'Checkout',
+      pageUrl: 'https://example.com/checkout',
+      target: {
+        tagName: 'button',
+        selector: '[data-testid="pay-now"]',
+        domPath: 'body > main > button.primary',
+        componentName: 'CheckoutButton',
+      },
+    })
+
+    expect(payload.target).toMatchObject({
+      selector: '[data-testid="pay-now"]',
+      componentName: 'CheckoutButton',
+    })
   })
 
   it('rejects oversized screenshot', () => {
