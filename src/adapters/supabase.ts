@@ -96,13 +96,20 @@ export function supabaseAdapter(options: SupabaseAdapterOptions): FeedbackAdapte
         sender_email: payload.user?.email ?? null,
         image_base64: payload.screenshot?.base64 ?? null,
         image_mime_type: payload.screenshot?.mimeType ?? null,
-        metadata: payload.metadata
-          ? {
-              viewport: payload.metadata.viewport,
-              userAgent: payload.metadata.userAgent,
-              consoleErrors: payload.metadata.consoleErrors,
-            }
-          : null,
+        metadata:
+          payload.metadata || payload.target
+            ? {
+                ...(payload.metadata
+                  ? {
+                      viewport: payload.metadata.viewport,
+                      userAgent: payload.metadata.userAgent,
+                      consoleErrors: payload.metadata.consoleErrors,
+                      custom: payload.metadata.custom,
+                    }
+                  : {}),
+                target: payload.target,
+              }
+            : null,
         delivered: false,
         delivery_channel: null,
         delivery_id: null,

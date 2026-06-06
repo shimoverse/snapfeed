@@ -143,6 +143,26 @@ export function slackAdapter(options: SlackAdapterOptions): FeedbackAdapter {
         })
       }
 
+      if (payload.target) {
+        const bits = [
+          `*Selector:* \`${safe(payload.target.selector)}\``,
+          payload.target.componentName
+            ? `*Component:* ${safe(payload.target.componentName)}`
+            : undefined,
+          payload.target.ariaLabel
+            ? `*ARIA:* ${safe(payload.target.ariaLabel)}`
+            : undefined,
+          payload.target.text ? `*Text:* ${safe(payload.target.text)}` : undefined,
+        ].filter(Boolean)
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Target Element:*\n${bits.join('\n')}`,
+          },
+        })
+      }
+
       if (payload.metadata?.consoleErrors?.length) {
         blocks.push({
           type: 'section',

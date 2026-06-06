@@ -21,10 +21,45 @@ export interface FeedbackPayload {
   user?: FeedbackUser
   /** Auto-collected browser metadata */
   metadata?: FeedbackMetadata
+  /**
+   * Agent-ready context for the host-page element the reviewer most recently
+   * interacted with before opening/submitting snapfeed. Useful for coding
+   * agents that need a selector, DOM path, component hint, or style snapshot.
+   */
+  target?: FeedbackTargetContext
   /** Attached screenshot */
   screenshot?: FeedbackScreenshot
   /** Feedback category tag */
   category?: FeedbackCategory
+}
+
+export interface FeedbackTargetContext {
+  /** Lowercase tag name, e.g. "button" */
+  tagName: string
+  id?: string
+  classes?: string[]
+  /** Explicit ARIA role or a small inferred implicit role */
+  role?: string
+  ariaLabel?: string
+  /** Normalized, bounded visible text from the element */
+  text?: string
+  /** Best-effort CSS selector for locating the element */
+  selector: string
+  /** Human-readable path from body to the element */
+  domPath: string
+  /** Optional component hint from data-component or data-snapfeed-component */
+  componentName?: string
+  /** Agent-useful attributes such as data-testid, name, type, href, title */
+  attributes?: Record<string, string>
+  /** Viewport-relative element bounds at capture time */
+  boundingRect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  /** Bounded style snapshot for visual/UI agents */
+  computedStyles?: Record<string, string>
 }
 
 export interface FeedbackUser {
@@ -209,6 +244,15 @@ export interface FeedbackProviderConfig {
    * @default true
    */
   collectMetadata?: boolean
+  /**
+   * Automatically attach a bounded element snapshot for the last host-app
+   * element the reviewer clicked/focused before opening snapfeed.
+   *
+   * Captures selector, DOM path, text, ARIA label, component hints, bounds,
+   * and a small computed-style subset. snapfeed-owned UI is ignored.
+   * @default true
+   */
+  collectElementContext?: boolean
   /**
    * Automatically capture a screenshot when the widget opens.
    * Requires html2canvas as an optional peer dependency.

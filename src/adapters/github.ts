@@ -89,6 +89,24 @@ function buildIssueBody(payload: FeedbackPayload): string {
   lines.push(payload.text)
   lines.push('')
 
+  if (payload.target) {
+    lines.push('## Target Element')
+    lines.push('')
+    lines.push(`- **Selector:** \`${payload.target.selector}\``)
+    lines.push(`- **DOM path:** ${payload.target.domPath}`)
+    lines.push(`- **Tag:** \`${payload.target.tagName}\``)
+    if (payload.target.componentName) {
+      lines.push(`- **Component:** ${payload.target.componentName}`)
+    }
+    if (payload.target.ariaLabel) {
+      lines.push(`- **ARIA label:** ${payload.target.ariaLabel}`)
+    }
+    if (payload.target.text) {
+      lines.push(`- **Text:** ${payload.target.text}`)
+    }
+    lines.push('')
+  }
+
   if (payload.metadata) {
     lines.push('## Environment')
     lines.push('')

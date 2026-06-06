@@ -77,6 +77,7 @@ export type {
   FeedbackPayload,
   FeedbackUser,
   FeedbackMetadata,
+  FeedbackTargetContext,
   FeedbackMessages,
   FeedbackScreenshot,
   FeedbackAdapter,

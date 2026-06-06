@@ -5,5 +5,6 @@ export type {
   FeedbackPayload,
   FeedbackUser,
   FeedbackMetadata,
+  FeedbackTargetContext,
   FeedbackScreenshot,
 } from '../types'

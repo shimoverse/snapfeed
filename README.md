@@ -51,13 +51,36 @@ The usual loop looks like this:
 ```text
 reviewer agent or human
   → snapfeed widget / feedback API
-  → /api/feedback with screenshot + URL + metadata
+  → /api/feedback with screenshot + URL + metadata + target element context
   → Slack/JIRA/Linear/GitHub/webhook
   → orchestrator assigns coding agent
   → fix PR → tests → deployment
 ```
 
 snapfeed is not the orchestrator and does not auto-deploy by itself. It is the structured feedback handoff. Point `webhookAdapter` at Hermes, OpenClaw, your queue, or your own orchestration layer when you want feedback to trigger an agent run.
+
+### Element context for coding agents
+
+When `collectElementContext` is enabled (default), snapfeed remembers the last host-app element the reviewer clicked or focused before opening the widget. The submitted `FeedbackPayload` includes a bounded `target` object with a selector, DOM path, tag, ARIA label, visible text, component hint from `data-component` / `data-snapfeed-component`, viewport bounds, and a small computed-style snapshot. snapfeed-owned UI is marked with `data-snapfeed-ui` and ignored, so pressing Send does not replace the original app target.
+
+This is the Agentation-style precision layer inside snapfeed's broader workflow: agents get enough detail to grep or inspect the exact UI element, while snapfeed still routes the feedback to Slack, GitHub, Linear, JIRA, Supabase, or your orchestrator. GitHub and Slack destinations show the target selector; Supabase stores it under `metadata.target`; webhooks receive the full payload.
+
+```json
+{
+  "text": "Button copy feels risky",
+  "pageUrl": "https://staging.example.com/checkout",
+  "target": {
+    "tagName": "button",
+    "selector": "[data-testid=\"pay-now\"]",
+    "domPath": "body > main > button.primary",
+    "componentName": "CheckoutButton",
+    "ariaLabel": "Pay now",
+    "text": "Pay now"
+  }
+}
+```
+
+Disable it for privacy-sensitive surfaces with `<FeedbackProvider collectElementContext={false}>` or override `payload.target` when submitting programmatically.
 
 ### Agent install and verification checklist
 
@@ -221,6 +244,7 @@ import { FeedbackProvider } from 'snapfeed'
 | `adapters` | `FeedbackAdapter[]` | `[]` | Client-side adapters. Skipped when `apiUrl` is in use |
 | `apiUrl` | `string` | `"/api/feedback"` | Server route the widget POSTs to (recommended for prod) |
 | `collectMetadata` | `boolean` | `true` | Auto-collect viewport, UA, console errors |
+| `collectElementContext` | `boolean` | `true` | Auto-attach last clicked/focused host element selector, DOM path, ARIA/text, component hint, bounds, and style snapshot for coding agents |
 | `autoScreenshot` | `boolean` | `false` | Capture screenshot on open via `html2canvas` |
 | `enableInProduction` | `boolean` | `false` | Show widget in prod (off by default — safety rail) |
 | `user` | `{ name?: string; email?: string }` | — | Reporter identity attached to every submission |

@@ -89,6 +89,7 @@ export function FeedbackButton({
     <button
       onClick={toggle}
       aria-label="Send feedback"
+      data-snapfeed-ui="true"
       className={className}
       style={resolvedStyle}
       onMouseEnter={e => {

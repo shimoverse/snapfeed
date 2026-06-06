@@ -15,7 +15,7 @@ The shape of the document follows the system's actual concerns: how the runtime 
 
 ## 1. The 30-second mental model
 
-snapfeed is a React widget and a security-hardened server handler joined by a JSON HTTP POST. The widget runs in the consumer's browser, captures text + (optional) screenshot + metadata, and POSTs to the consumer's own API route. That route validates, rate-limits, redacts, and fans out to one or more **adapter** functions — each one a small piece of code that delivers feedback to a specific destination (Slack, JIRA, GitHub Issues, a Postgres row, an audit JSONL, etc.). snapfeed runs nothing centrally; there is no relay, no telemetry, no hosted SaaS.
+snapfeed is a React widget and a security-hardened server handler joined by a JSON HTTP POST. The widget runs in the consumer's browser, captures text + (optional) screenshot + metadata + last-clicked target element context, and POSTs to the consumer's own API route. That route validates, rate-limits, redacts, and fans out to one or more **adapter** functions — each one a small piece of code that delivers feedback to a specific destination (Slack, JIRA, GitHub Issues, a Postgres row, an audit JSONL, etc.). snapfeed runs nothing centrally; there is no relay, no telemetry, no hosted SaaS.
 
 ```mermaid
 flowchart LR

@@ -55,9 +55,9 @@ describe('githubAdapter', () => {
     expect(result.deliveryId).toBeUndefined()
   })
 
-  it('returns ok=true with deliveryId when 2xx body is valid', async () => {
+  it('includes target selector context in the issue body for coding agents', async () => {
     fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ number: 42, html_url: 'https://x' }), {
+      new Response(JSON.stringify({ number: 43, html_url: 'https://x/43' }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -68,9 +68,22 @@ describe('githubAdapter', () => {
       owner: 'me',
       repo: 'feedback',
     })
-    const result = await adapter.send(basePayload)
+    await adapter.send({
+      ...basePayload,
+      target: {
+        tagName: 'button',
+        selector: '[data-testid="pay-now"]',
+        domPath: 'body > main > button.primary',
+        componentName: 'CheckoutButton',
+        ariaLabel: 'Pay now',
+        text: 'Pay now',
+      },
+    })
 
-    expect(result.ok).toBe(true)
-    expect(result.deliveryId).toBe('42')
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body)
+    expect(body.body).toContain('## Target Element')
+    expect(body.body).toContain('`[data-testid="pay-now"]`')
+    expect(body.body).toContain('CheckoutButton')
+    expect(body.body).toContain('body > main > button.primary')
   })
 })

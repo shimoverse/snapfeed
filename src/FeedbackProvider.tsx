@@ -22,6 +22,10 @@ import type {
 import { FeedbackWidget } from './FeedbackWidget'
 import { FeedbackButton } from './FeedbackButton'
 import { summarizeAdapterResults } from './lib/adapter-results'
+import {
+  buildElementContext,
+  shouldIgnoreElementForSnapfeedContext,
+} from './element-context'
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -175,6 +179,7 @@ const DEFAULT_CONFIG = {
   // on the default light theme.
   accentColor: '#B85A36',
   collectMetadata: true,
+  collectElementContext: true,
   autoScreenshot: false,
   enableInProduction: false,
   apiUrl: '/api/feedback',
@@ -250,6 +255,7 @@ export function FeedbackProvider({
       config.theme,
       config.accentColor,
       config.collectMetadata,
+      config.collectElementContext,
       config.autoScreenshot,
       config.enableInProduction,
       config.apiUrl,
@@ -267,6 +273,7 @@ export function FeedbackProvider({
   )
   const [isOpen, setIsOpen] = useState(false)
   const [lastResults, setLastResults] = useState<FeedbackDeliveryRecord[]>([])
+  const lastTargetElementRef = useRef<Element | null>(null)
 
   /**
    * Update the persisted identity (used by the widget's inline "set name"
@@ -319,6 +326,29 @@ export function FeedbackProvider({
     if (!isEnabled) return
     return patchConsoleError()
   }, [isEnabled])
+
+  // Track the last meaningful host-app element the reviewer clicked or
+  // focused. This gives coding agents a selector/component/style target
+  // without forcing the user into a separate annotation mode. snapfeed-owned
+  // DOM is explicitly ignored so opening/submitting the widget doesn't replace
+  // the app element that caused the feedback.
+  useEffect(() => {
+    if (!isEnabled || !mergedConfig.collectElementContext) return
+
+    function rememberTarget(e: Event) {
+      const target = e.target
+      if (!(target instanceof Element)) return
+      if (shouldIgnoreElementForSnapfeedContext(target)) return
+      lastTargetElementRef.current = target
+    }
+
+    document.addEventListener('pointerdown', rememberTarget, true)
+    document.addEventListener('focusin', rememberTarget, true)
+    return () => {
+      document.removeEventListener('pointerdown', rememberTarget, true)
+      document.removeEventListener('focusin', rememberTarget, true)
+    }
+  }, [isEnabled, mergedConfig.collectElementContext])
 
   // Hotkey listener
   useEffect(() => {
@@ -384,6 +414,11 @@ export function FeedbackProvider({
         timestamp: new Date().toISOString(),
         metadata: mergedMetadata,
         user: partial.user ?? mergedConfig.user,
+        target:
+          partial.target ??
+          (mergedConfig.collectElementContext
+            ? buildElementContext(lastTargetElementRef.current)
+            : undefined),
       }
 
       // Reset before dispatch so a stale prior-success doesn't bleed over
